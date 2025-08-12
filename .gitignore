@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# build outputs
+.next/
+dist/
+out/
+
+# environment files
+.env
+.env.*
+!.env.example
+secrets/
+
+# public originals
+public/originals/
+
+# misc
+.DS_Store
+*.local
