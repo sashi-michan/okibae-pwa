@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import Stepper from '../components/Stepper'
+import StepCard from '../components/StepCard'
 
 type BgOption = 'white' | 'beige' | 'stripe'
 
@@ -136,67 +138,73 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="card">
+    <div>
+      <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold tracking-wide">OKIBAE — おしゃれな置き画を、かんたんに</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          まずは画像を1枚えらんでね。<span className="badge">Step 1</span>
-        </p>
-        <div className="mt-4 flex items-center gap-3 flex-wrap">
-          <label className="btn btn-ghost cursor-pointer">
-            <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
-            画像を選ぶ
-          </label>
-          <button className="btn btn-primary disabled:opacity-50" disabled={!imgUrl || isBusy} onClick={() => drawComposite({ useCutout: !!cutoutUrl, bg })}>
-            {isBusy ? '処理中…' : 'プレビュー更新'}
-          </button>
-          <button className="btn btn-ghost disabled:opacity-50" onClick={handleSave} disabled={!imgUrl}>
-            画像を保存
-          </button>
-          {processing && <span className="text-xs text-gray-500">背景消し中…（数秒）</span>}
+      </div>
+      
+      <div className="grid lg:grid-cols-[260px_1fr] gap-6">
+        <div className="lg:block hidden">
+          <Stepper currentStep={1} />
         </div>
-      </section>
-
-      <section className="grid md:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="font-semibold">プレビュー</h2>
-          <div className={clsx("mt-3 aspect-square w-full overflow-hidden rounded-xl2 border")}
-            style={bg === 'stripe'
-              ? { backgroundImage: 'repeating-linear-gradient(180deg,#FAF9F6 0px,#FAF9F6 8px,#F2ECE4 8px,#F2ECE4 16px)' }
-              : { backgroundColor: bg === 'white' ? '#FFFFFF' : '#F4EDE4' }
-            }>
-            {imgUrl ? (
-              <img
-                ref={imgRef}
-                src={imgUrl}
-                alt="preview"
-                className="h-full w-full object-contain"
-                onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
-              />
-            ) : (
-              <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
-            )}
+        
+        <div className="space-y-6">
+          <div className="lg:hidden">
+            <Stepper currentStep={1} />
           </div>
-
-          <div className="mt-4 flex items-center gap-2">
-            <BgBadge current={bg} value="white" label="白" onClick={handleBgPreset} />
-            <BgBadge current={bg} value="beige" label="ベージュ" onClick={handleBgPreset} />
-            <BgBadge current={bg} value="stripe" label="布っぽい" onClick={handleBgPreset} />
-          </div>
+          
+          <StepCard stepNumber={1} title="画像を選ぶ">
+            <p className="mb-4 text-sm text-gray-600">
+              まずは画像を1枚えらんでね。
+            </p>
+            <label className="btn btn-ghost cursor-pointer">
+              <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
+              画像を選ぶ
+            </label>
+          </StepCard>
+          
+          <StepCard stepNumber={2} title="背景を選ぶ">
+            <div className="flex items-center gap-2">
+              <BgBadge current={bg} value="white" label="白" onClick={handleBgPreset} />
+              <BgBadge current={bg} value="beige" label="ベージュ" onClick={handleBgPreset} />
+              <BgBadge current={bg} value="stripe" label="布っぽい" onClick={handleBgPreset} />
+            </div>
+            {processing && <p className="mt-2 text-xs text-gray-500">背景消し中…（数秒）</p>}
+          </StepCard>
+          
+          <StepCard stepNumber={3} title="最終確認">
+            <div className={clsx("aspect-square w-full overflow-hidden rounded-xl border")}
+              style={bg === 'stripe'
+                ? { backgroundImage: 'repeating-linear-gradient(180deg,#FAF9F6 0px,#FAF9F6 8px,#F2ECE4 8px,#F2ECE4 16px)' }
+                : { backgroundColor: bg === 'white' ? '#FFFFFF' : '#F4EDE4' }
+              }>
+              {imgUrl ? (
+                <img
+                  ref={imgRef}
+                  src={imgUrl}
+                  alt="preview"
+                  className="h-full w-full object-contain"
+                  onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
+                />
+              ) : (
+                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
+              )}
+            </div>
+            <button className="mt-4 btn btn-primary disabled:opacity-50" disabled={!imgUrl || isBusy} onClick={() => drawComposite({ useCutout: !!cutoutUrl, bg })}>
+              {isBusy ? '処理中…' : 'プレビュー更新'}
+            </button>
+          </StepCard>
+          
+          <StepCard stepNumber={4} title="保存">
+            <div className="mb-4">
+              <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
+            </div>
+            <button className="btn btn-ghost disabled:opacity-50" onClick={handleSave} disabled={!imgUrl}>
+              画像を保存
+            </button>
+          </StepCard>
         </div>
-
-        <div className="card">
-          <h2 className="font-semibold">出力キャンバス（保存用）</h2>
-          <p className="mt-2 text-xs text-gray-500">※ 保存ボタンを押すとここに出力してからダウンロードします</p>
-          <div className="mt-3 overflow-auto">
-            <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
-          </div>
-          <ul className="mt-4 text-sm text-gray-600 list-disc pl-5 space-y-1">
-            <li>背景ボタン＝仮合成 → 自動で本合成（切り抜き＋色なじみ＋影）</li>
-            <li>切り抜き中はラベル表示、完了後に自動差し替え</li>
-          </ul>
-        </div>
-      </section>
+      </div>
     </div>
   )
 }
