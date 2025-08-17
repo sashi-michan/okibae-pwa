@@ -9,7 +9,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
   const [cutoutUrl, setCutoutUrl] = useState<string>('')     // 透過PNG（切り抜き）
-  const [bg, setBg] = useState<BgOption>('white')
+  const [bg, setBg] = useState<BgOption | null>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [processing, setProcessing] = useState(false)        // 切り抜き中
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
@@ -163,22 +163,25 @@ export default function Home() {
             </label>
           </StepCard>
           
-          <StepCard stepNumber={2} title="背景を選ぶ">
-            <div className="flex items-center gap-2">
+          <StepCard stepNumber={2} title="背景を選んでプレビュー">
+            <div className="mb-4 flex items-center gap-2">
               <BgBadge current={bg} value="white" label="白" onClick={handleBgPreset} />
               <BgBadge current={bg} value="beige" label="ベージュ" onClick={handleBgPreset} />
               <BgBadge current={bg} value="stripe" label="布っぽい" onClick={handleBgPreset} />
             </div>
-            {processing && <p className="mt-2 text-xs text-gray-500">背景消し中…（数秒）</p>}
-          </StepCard>
-          
-          <StepCard stepNumber={3} title="最終確認">
+            
             <div className={clsx("aspect-square w-full overflow-hidden rounded-xl border")}
               style={bg === 'stripe'
                 ? { backgroundImage: 'repeating-linear-gradient(180deg,#FAF9F6 0px,#FAF9F6 8px,#F2ECE4 8px,#F2ECE4 16px)' }
-                : { backgroundColor: bg === 'white' ? '#FFFFFF' : '#F4EDE4' }
+                : bg === 'white' ? { backgroundColor: '#FFFFFF' } 
+                : bg === 'beige' ? { backgroundColor: '#F4EDE4' }
+                : { backgroundColor: '#F9F9F9' }
               }>
-              {imgUrl ? (
+              {!imgUrl ? (
+                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
+              ) : !bg ? (
+                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">背景を選んでください</div>
+              ) : (
                 <img
                   ref={imgRef}
                   src={imgUrl}
@@ -186,16 +189,12 @@ export default function Home() {
                   className="h-full w-full object-contain"
                   onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
                 />
-              ) : (
-                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
               )}
             </div>
-            <button className="mt-4 btn btn-primary disabled:opacity-50" disabled={!imgUrl || isBusy} onClick={() => drawComposite({ useCutout: !!cutoutUrl, bg })}>
-              {isBusy ? '処理中…' : 'プレビュー更新'}
-            </button>
+            {processing && <p className="mt-2 text-xs text-gray-500">背景消し中…（数秒）</p>}
           </StepCard>
           
-          <StepCard stepNumber={4} title="保存">
+          <StepCard stepNumber={3} title="保存">
             <div className="mb-4">
               <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
             </div>
