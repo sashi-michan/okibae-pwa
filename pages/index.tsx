@@ -96,11 +96,21 @@ export default function Home() {
   }
 
   const handleGenerateFinal = async () => {
-    if (!bg || !cutoutUrl) return
+    console.log('handleGenerateFinal called', { bg, cutoutUrl })
+    if (!bg || !cutoutUrl) {
+      console.log('Missing bg or cutoutUrl, returning')
+      return
+    }
     setIsBusy(true)
-    await drawComposite({ useCutout: true, bg })
-    setFinalImageGenerated(true)
-    setIsBusy(false)
+    setFinalImageGenerated(true) // キャンバスを先に表示
+    
+    // キャンバスがDOMに追加されるまで少し待つ
+    setTimeout(async () => {
+      console.log('Starting drawComposite after timeout')
+      await drawComposite({ useCutout: true, bg })
+      console.log('drawComposite completed')
+      setIsBusy(false)
+    }, 100)
   }
 
   const handleSave = async () => {
@@ -112,19 +122,33 @@ export default function Home() {
   }
 
   const drawComposite = async ({ useCutout, bg }:{ useCutout:boolean; bg:BgOption | null }) => {
-    if (!canvasRef.current || !bg) return
+    console.log('drawComposite called', { useCutout, bg, hasCanvas: !!canvasRef.current })
+    if (!canvasRef.current || !bg) {
+      console.log('Early return from drawComposite')
+      return
+    }
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')!
 
     const outW = 1200, outH = 1200
     canvas.width = outW; canvas.height = outH
+    console.log('Canvas setup complete', { outW, outH })
 
     drawBackground(ctx, outW, outH, bg)
+    console.log('Background drawn')
 
     const src = (useCutout && cutoutUrl) ? cutoutUrl : imgUrl
-    if (!src) return
+    console.log('Image source determined', { src: src ? 'data:...' : 'null', useCutout, cutoutUrl: cutoutUrl ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
+    if (!src) {
+      console.log('No src, returning')
+      return
+    }
     const img = await loadImage(src)
-    if (!img) return
+    if (!img) {
+      console.log('Failed to load image')
+      return
+    }
+    console.log('Image loaded successfully', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight })
 
     // 配置サイズ（縦横どちらにも収まるようにフィット）
     const pad = Math.round(outW * 0.06)
@@ -144,6 +168,7 @@ export default function Home() {
     const y = Math.round((outH - drawH) / 2)
 
     if (useCutout && cutoutUrl) {
+      console.log('Drawing with cutout image')
       drawContactShadow(ctx, img, x, y, drawW, drawH, 0.22)
       ctx.filter = 'brightness(1.06) contrast(1.08)'
       ctx.drawImage(img, x, y, drawW, drawH)
@@ -155,11 +180,15 @@ export default function Home() {
       ctx.globalCompositeOperation = 'multiply'
       ctx.fillStyle = `rgba(${r},${g},${b},0.05)`; ctx.fillRect(0,0,outW,outH)
       ctx.restore()
+      console.log('Cutout drawing complete')
     } else {
+      console.log('Drawing without cutout')
       ctx.filter = 'brightness(1.04) contrast(1.06)'
       ctx.drawImage(img, x, y, drawW, drawH)
       ctx.filter = 'none'
+      console.log('Normal drawing complete')
     }
+    console.log('drawComposite function completed')
   }
 
   return (
