@@ -218,18 +218,25 @@ export default function Home() {
                 <div className="relative h-full w-full">
                   <img
                     ref={imgRef}
-                    src={imgUrl}
+                    src={cutoutUrl || imgUrl}
                     alt="preview"
                     className="h-full w-full object-contain"
                     onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
                   />
                   <div className="absolute top-2 left-2 bg-green-500/90 text-white px-3 py-1 rounded-lg text-xs">
-                    こんな感じになります
+                    {cutoutUrl ? '完成プレビュー' : 'こんな感じになります'}
                   </div>
+                  {processing && (
+                    <div className="absolute inset-0 bg-black/20 grid place-content-center">
+                      <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                        背景除去中...
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            {processing && <p className="mt-2 text-xs text-gray-500">背景消し中…（数秒）</p>}
           </StepCard>
           
           <StepCard stepNumber={3} title="保存">
