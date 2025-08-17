@@ -13,6 +13,7 @@ export default function Home() {
   const [isBusy, setIsBusy] = useState(false)
   const [processing, setProcessing] = useState(false)        // 切り抜き中
   const [previewCompositing, setPreviewCompositing] = useState(false) // 仮合成中
+  const [finalImageGenerated, setFinalImageGenerated] = useState(false) // 最終画像生成済み
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -24,6 +25,12 @@ export default function Home() {
     setImgUrl(url)
     setCutoutUrl('')
     setImageKey(String(Date.now()))
+    
+    // 画像選択時に背景除去を自動実行
+    setTimeout(() => {
+      ensureCutout()
+    }, 100) // imgRefが設定されるまで少し待つ
+    
     return () => URL.revokeObjectURL(url)
   }, [file])
 
@@ -44,7 +51,12 @@ export default function Home() {
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f) setFile(f)
+    if (f) {
+      setFile(f)
+      // 画像選択時に背景除去を開始
+      setCutoutUrl('') // 前の切り抜き結果をクリア
+      setFinalImageGenerated(false) // 最終画像生成状態をリセット
+    }
   }
 
   const handleBgPreset = async (next: BgOption) => {
@@ -54,8 +66,8 @@ export default function Home() {
     await drawComposite({ useCutout: false, bg: next }) // 仮合成実行
     setPreviewCompositing(false) // 仮合成完了
     
-    // バックグラウンドで背景除去処理続行
-    ensureCutout().then(() => drawComposite({ useCutout: true, bg: next }))
+    // 背景除去は画像選択時に既に実行済み
+    // cutoutUrlがあれば自動で本合成が実行される（useEffectで）
   }
 
   const ensureCutout = async () => {
@@ -83,8 +95,15 @@ export default function Home() {
     }
   }
 
+  const handleGenerateFinal = async () => {
+    if (!bg || !cutoutUrl) return
+    setIsBusy(true)
+    await drawComposite({ useCutout: true, bg })
+    setFinalImageGenerated(true)
+    setIsBusy(false)
+  }
+
   const handleSave = async () => {
-    await drawComposite({ useCutout: !!cutoutUrl, bg })
     const canvas = canvasRef.current
     if (!canvas) return
     const url = canvas.toDataURL('image/png')
@@ -241,11 +260,28 @@ export default function Home() {
           
           <StepCard stepNumber={3} title="保存">
             <div className="mb-4">
-              <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
+              {!finalImageGenerated ? (
+                <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
+                  「作成！」ボタンを押すと最終画像を生成します
+                </div>
+              ) : (
+                <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
+              )}
             </div>
-            <button className="btn btn-ghost disabled:opacity-50" onClick={handleSave} disabled={!imgUrl}>
-              画像を保存
-            </button>
+            
+            {!finalImageGenerated ? (
+              <button 
+                className="btn btn-primary disabled:opacity-50" 
+                onClick={handleGenerateFinal} 
+                disabled={!bg || !cutoutUrl || isBusy}
+              >
+                {isBusy ? '作成中...' : '作成！'}
+              </button>
+            ) : (
+              <button className="btn btn-ghost" onClick={handleSave}>
+                画像をダウンロード
+              </button>
+            )}
           </StepCard>
         </div>
       </div>
