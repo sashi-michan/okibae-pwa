@@ -12,6 +12,7 @@ export default function Home() {
   const [bg, setBg] = useState<BgOption | null>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [processing, setProcessing] = useState(false)        // 切り抜き中
+  const [previewCompositing, setPreviewCompositing] = useState(false) // 仮合成中
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -48,7 +49,12 @@ export default function Home() {
 
   const handleBgPreset = async (next: BgOption) => {
     setBg(next)
-    await drawComposite({ useCutout: false, bg: next })
+    setPreviewCompositing(true) // 仮合成中表示開始
+    
+    await drawComposite({ useCutout: false, bg: next }) // 仮合成実行
+    setPreviewCompositing(false) // 仮合成完了
+    
+    // バックグラウンドで背景除去処理続行
     ensureCutout().then(() => drawComposite({ useCutout: true, bg: next }))
   }
 
@@ -180,15 +186,47 @@ export default function Home() {
               {!imgUrl ? (
                 <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
               ) : !bg ? (
-                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">背景を選んでください</div>
+                <div className="relative h-full w-full">
+                  <img
+                    ref={imgRef}
+                    src={imgUrl}
+                    alt="preview"
+                    className="h-full w-full object-contain"
+                  />
+                  <div className="absolute inset-0 bg-black/10 grid place-content-center">
+                    <div className="bg-white/90 px-4 py-2 rounded-lg text-sm text-gray-700">
+                      背景を選ぶと加工されます
+                    </div>
+                  </div>
+                </div>
+              ) : previewCompositing ? (
+                <div className="relative h-full w-full">
+                  <img
+                    ref={imgRef}
+                    src={imgUrl}
+                    alt="preview"
+                    className="h-full w-full object-contain"
+                  />
+                  <div className="absolute inset-0 bg-black/20 grid place-content-center">
+                    <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                      仮合成中...
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <img
-                  ref={imgRef}
-                  src={imgUrl}
-                  alt="preview"
-                  className="h-full w-full object-contain"
-                  onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
-                />
+                <div className="relative h-full w-full">
+                  <img
+                    ref={imgRef}
+                    src={imgUrl}
+                    alt="preview"
+                    className="h-full w-full object-contain"
+                    onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
+                  />
+                  <div className="absolute top-2 left-2 bg-green-500/90 text-white px-3 py-1 rounded-lg text-xs">
+                    こんな感じになります
+                  </div>
+                </div>
               )}
             </div>
             {processing && <p className="mt-2 text-xs text-gray-500">背景消し中…（数秒）</p>}
