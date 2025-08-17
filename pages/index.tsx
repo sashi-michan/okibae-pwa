@@ -310,26 +310,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-function drawContactShadow(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, opacity: number) {
-  ctx.save()
-  ctx.globalAlpha = opacity
-  ctx.filter = 'blur(8px)'
-  ctx.drawImage(img, x + 4, y + h - 20, w, 20)
-  ctx.restore()
-}
-
-function estimateBgAverage(ctx: CanvasRenderingContext2D, w: number, h: number): [number, number, number] {
-  const data = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50))
-  let r = 0, g = 0, b = 0, count = 0
-  for (let i = 0; i < data.data.length; i += 4) {
-    r += data.data[i]
-    g += data.data[i + 1] 
-    b += data.data[i + 2]
-    count++
-  }
-  return count > 0 ? [Math.round(r/count), Math.round(g/count), Math.round(b/count)] : [200, 200, 200]
-}
-
 function drawBackground(ctx: CanvasRenderingContext2D, w:number, h:number, bg: BgOption) {
   if (bg === 'white') {
     ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,w,h)
