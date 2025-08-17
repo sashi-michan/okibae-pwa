@@ -289,7 +289,7 @@ export default function Home() {
   )
 }
 
-function BgBadge({ current, value, label, onClick }:{ current: BgOption, value: BgOption, label: string, onClick: (v: BgOption)=>void | Promise<void> }) {
+function BgBadge({ current, value, label, onClick }:{ current: BgOption | null, value: BgOption, label: string, onClick: (v: BgOption)=>void | Promise<void> }) {
   const active = current === value
   return (
     <button
@@ -299,15 +299,6 @@ function BgBadge({ current, value, label, onClick }:{ current: BgOption, value: 
       {label}
     </button>
   )
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = src
-  })
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, w:number, h:number, bg: BgOption) {
