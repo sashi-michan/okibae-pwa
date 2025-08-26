@@ -5,15 +5,19 @@ import StepCard from '../components/StepCard'
 
 type BgOption = 'white' | 'beige' | 'stripe'
 
+type AppState = {
+  phase: 'IDLE' | 'PREVIEW' | 'FINAL_RENDERING' | 'FINAL_READY'
+  status?: 'loading' | 'error'
+  error?: string
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
   const [cutoutUrl, setCutoutUrl] = useState<string>('')     // 透過PNG（切り抜き）
+  const [shadowUrl, setShadowUrl] = useState<string>('')    // 影付き画像（切り抜き+影）
   const [bg, setBg] = useState<BgOption | null>(null)
-  const [isBusy, setIsBusy] = useState(false)
-  const [processing, setProcessing] = useState(false)        // 切り抜き中
-  const [previewCompositing, setPreviewCompositing] = useState(false) // 仮合成中
-  const [finalImageGenerated, setFinalImageGenerated] = useState(false) // 最終画像生成済み
+  const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -24,58 +28,201 @@ export default function Home() {
     const url = URL.createObjectURL(file)
     setImgUrl(url)
     setCutoutUrl('')
+    setShadowUrl('')
     setImageKey(String(Date.now()))
     
-    // 画像選択時に背景除去を自動実行
-    setTimeout(() => {
-      ensureCutout()
-    }, 100) // imgRefが設定されるまで少し待つ
+    // IDLE状態に設定（完全リセット）
+    setAppState({ phase: 'IDLE' })
     
     return () => URL.revokeObjectURL(url)
   }, [file])
 
-  // cutoutUrl が来たら、今の背景で本合成に描き直す
+  // 司令塔useEffect - 全ての処理を一元管理
   useEffect(() => {
-    if (cutoutUrl) {
-      drawComposite({ useCutout: true, bg });
+    const handleStateTransition = async () => {
+      console.log('State transition:', { phase: appState.phase, bg, cutoutUrl: !!cutoutUrl, shadowUrl: !!shadowUrl })
+      
+      switch (appState.phase) {
+        case 'IDLE':
+          // 画像選択済み + 背景未選択の状態
+          // 背景除去の自動実行
+          if (imgUrl && !cutoutUrl && imgRef.current && !appState.status) {
+            console.log('Starting background removal')
+            setAppState({ phase: 'IDLE', status: 'loading' })
+            await ensureCutout()
+          }
+          // 背景が選択されたらPREVIEWに移行
+          if (cutoutUrl && bg) {
+            console.log('Moving to PREVIEW phase')
+            setAppState({ phase: 'PREVIEW' })
+          }
+          break
+          
+        case 'PREVIEW':
+          // 軽量影生成 → プレビュー表示
+          if (cutoutUrl && bg && !shadowUrl && !appState.status) {
+            console.log('Starting preview shadow generation with OpenCV - quality: preview')
+            setAppState({ phase: 'PREVIEW', status: 'loading' })
+            const backgroundColor = getBackgroundColor(bg)
+            const enhancedUrl = await enhanceWithShadowOpenCV(cutoutUrl, backgroundColor, true, { quality: 'preview' })
+            setShadowUrl(enhancedUrl) // 手動で状態更新
+            setAppState({ phase: 'PREVIEW' }) // loading完了
+          }
+          break
+          
+        case 'FINAL_RENDERING':
+          // 高品質影生成 + drawComposite → FINAL_READY
+          console.log('FINAL_RENDERING condition check:', {
+            cutoutUrl: !!cutoutUrl,
+            bg: !!bg,
+            canvasRef: !!canvasRef.current,
+            noStatus: !appState.status,
+            currentStatus: appState.status
+          })
+          
+          if (cutoutUrl && bg && canvasRef.current && !appState.status) {
+            console.log('Starting final rendering with OpenCV')
+            setAppState({ phase: 'FINAL_RENDERING', status: 'loading' })
+            const backgroundColor = getBackgroundColor(bg)
+            const enhancedUrl = await enhanceWithShadowOpenCV(cutoutUrl, backgroundColor, false, { quality: 'final' })
+            await drawComposite({ bg, customCutoutUrl: enhancedUrl })
+            setAppState({ phase: 'FINAL_READY' })
+          }
+          break
+          
+        case 'FINAL_READY':
+          // 完了状態、追加処理なし
+          break
+      }
     }
+    
+    handleStateTransition()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cutoutUrl]);
+  }, [appState.phase, bg, cutoutUrl, shadowUrl, imgUrl])
 
-  // 背景を切り替えたら、手元にcutoutがあれば本合成／なければ仮合成
-  useEffect(() => {
-    if (!imgUrl) return;
-    drawComposite({ useCutout: !!cutoutUrl, bg });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bg]);
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) {
+      // プレビュー以降の状態で画像を選び直す場合は確認アラート
+      if (appState.phase === 'PREVIEW' || appState.phase === 'FINAL_RENDERING' || appState.phase === 'FINAL_READY') {
+        const confirmed = window.confirm('現在の変更が削除されます！')
+        if (!confirmed) {
+          // ファイル選択をリセット
+          e.target.value = ''
+          return
+        }
+      }
+      
       setFile(f)
-      // 画像選択時に背景除去を開始
-      setCutoutUrl('') // 前の切り抜き結果をクリア
-      setFinalImageGenerated(false) // 最終画像生成状態をリセット
+      // 画像選択時の状態クリアはuseEffectで自動処理される
+    }
+  }
+
+  const getBackgroundColor = (bg: BgOption): string => {
+    switch (bg) {
+      case 'white': return '#FFFFFF'
+      case 'beige': return '#F4EDE4'
+      case 'stripe': return '#FAF9F6' // 布っぽい背景の基調色
+      default: return '#FFFFFF'
+    }
+  }
+
+  const enhanceWithShadow = async (cutoutBase64: string, backgroundColor: string, updateState: boolean = false) => {
+    console.log('enhanceWithShadow called', { backgroundColor, updateState, cutoutLength: cutoutBase64.length })
+    try {
+      const resp = await fetch('/api/enhance-shadow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          cutoutImageBase64: cutoutBase64,
+          backgroundColor 
+        })
+      })
+      
+      console.log('enhance-shadow response status:', resp.status)
+      
+      if (!resp.ok) {
+        const errorText = await resp.text()
+        console.error('enhance-shadow HTTP error:', resp.status, errorText)
+        return cutoutBase64
+      }
+      
+      const data = await resp.json()
+      console.log('enhance-shadow response:', { ok: data.ok, hasImage: !!data.enhancedImageBase64 })
+      
+      if (!data.ok) {
+        console.error('Shadow enhancement failed:', data.error)
+        return cutoutBase64 // フォールバック：元の画像を返す
+      }
+      
+      // 状態更新フラグが有効な場合、shadowUrlを更新
+      if (updateState) {
+        console.log('Updating shadowUrl state')
+        setShadowUrl(data.enhancedImageBase64)
+      }
+      
+      return data.enhancedImageBase64
+    } catch (e: any) {
+      console.error('Shadow enhancement error:', e.message, e)
+      return cutoutBase64 // フォールバック：元の画像を返す
     }
   }
 
   const handleBgPreset = async (next: BgOption) => {
+    // 最終画像生成済みの場合は確認ダイアログを表示
+    if (appState.phase === 'FINAL_READY') {
+      const confirmed = window.confirm('最終画像をクリアします！')
+      if (!confirmed) {
+        return // 変更をキャンセル
+      }
+      // プレビューに戻す
+      setShadowUrl('') // 影画像もクリア
+    }
+
     setBg(next)
-    setPreviewCompositing(true) // 仮合成中表示開始
     
-    await drawComposite({ useCutout: false, bg: next }) // 仮合成実行
-    setPreviewCompositing(false) // 仮合成完了
-    
-    // 背景除去は画像選択時に既に実行済み
-    // cutoutUrlがあれば自動で本合成が実行される（useEffectで）
+    // 状態遷移は司令塔useEffectが自動で処理
+    if (cutoutUrl) {
+      // 影画像をクリアしてから新しい背景でPREVIEWに移行
+      setShadowUrl('')
+      setAppState({ phase: 'PREVIEW' })
+    }
   }
 
   const ensureCutout = async () => {
-    if (cutoutUrl || processing || !imgRef.current) return
-    setProcessing(true)
+    if (cutoutUrl || !imgRef.current) return
     const myKey = imageKey
+    
     try {
-      const base64 = await toBase64Resized(imgRef.current, 1536)
+      // 画像の読み込み完了を待つ
+      const img = imgRef.current
+      if (!img.complete || img.naturalWidth === 0) {
+        console.log('Waiting for image to load...')
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Image load timeout'))
+          }, 10000) // 10秒タイムアウト
+          
+          img.onload = () => {
+            clearTimeout(timeout)
+            console.log('Image loaded:', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight })
+            resolve()
+          }
+          img.onerror = () => {
+            clearTimeout(timeout)
+            reject(new Error('Image load failed'))
+          }
+          
+          // 既に読み込まれている場合
+          if (img.complete && img.naturalWidth > 0) {
+            clearTimeout(timeout)
+            resolve()
+          }
+        })
+      }
+      
+      const base64 = await toBase64Resized(img, 1536)
       const resp = await fetch('/api/remove-bg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,33 +231,27 @@ export default function Home() {
       const data = await resp.json()
       if (myKey !== imageKey) return
       if (!data.ok) {
-        alert('背景消し失敗: ' + (data.error || 'unknown'))
+        console.error('背景消し失敗:', data.error || 'unknown')
+        setAppState({ phase: 'IDLE', status: 'error', error: data.error || '背景除去に失敗しました' })
         return
       }
       setCutoutUrl(data.pngBase64)
+      setAppState({ phase: 'IDLE' }) // loading完了
     } catch (e:any) {
       console.error('remove-bg error:', e.message)
-    } finally {
-      setProcessing(false)
+      setAppState({ phase: 'IDLE', status: 'error', error: '背景除去でエラーが発生しました' })
     }
   }
 
   const handleGenerateFinal = async () => {
-    console.log('handleGenerateFinal called', { bg, cutoutUrl })
+    console.log('handleGenerateFinal called', { phase: appState.phase, bg, cutoutUrl })
     if (!bg || !cutoutUrl) {
       console.log('Missing bg or cutoutUrl, returning')
       return
     }
-    setIsBusy(true)
-    setFinalImageGenerated(true) // キャンバスを先に表示
     
-    // キャンバスがDOMに追加されるまで少し待つ
-    setTimeout(async () => {
-      console.log('Starting drawComposite after timeout')
-      await drawComposite({ useCutout: true, bg })
-      console.log('drawComposite completed')
-      setIsBusy(false)
-    }, 100)
+    // 最終レンダリング開始
+    setAppState({ phase: 'FINAL_RENDERING' })
   }
 
   const handleSave = async () => {
@@ -121,8 +262,8 @@ export default function Home() {
     a.href = url; a.download = 'okibae.png'; a.click()
   }
 
-  const drawComposite = async ({ useCutout, bg }:{ useCutout:boolean; bg:BgOption | null }) => {
-    console.log('drawComposite called', { useCutout, bg, hasCanvas: !!canvasRef.current })
+  const drawComposite = async ({ bg, customCutoutUrl }:{ bg:BgOption | null; customCutoutUrl?: string }) => {
+    console.log('drawComposite called', { bg, hasCanvas: !!canvasRef.current })
     if (!canvasRef.current || !bg) {
       console.log('Early return from drawComposite')
       return
@@ -137,8 +278,8 @@ export default function Home() {
     drawBackground(ctx, outW, outH, bg)
     console.log('Background drawn')
 
-    const src = (useCutout && cutoutUrl) ? cutoutUrl : imgUrl
-    console.log('Image source determined', { src: src ? 'data:...' : 'null', useCutout, cutoutUrl: cutoutUrl ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
+    const src = customCutoutUrl || cutoutUrl || imgUrl
+    console.log('Image source determined', { src: src ? 'data:...' : 'null', cutoutUrl: cutoutUrl ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
     if (!src) {
       console.log('No src, returning')
       return
@@ -167,9 +308,9 @@ export default function Home() {
     const x = Math.round((outW - drawW) / 2)  // 中央寄せ
     const y = Math.round((outH - drawH) / 2)
 
-    if (useCutout && cutoutUrl) {
-      console.log('Drawing with cutout image')
-      drawContactShadow(ctx, img, x, y, drawW, drawH, 0.22)
+    if (cutoutUrl) {
+      console.log('Drawing with cutout image (OpenCV shadows)')
+      // OpenCV影統一なので自前影は削除済み
       ctx.filter = 'brightness(1.06) contrast(1.08)'
       ctx.drawImage(img, x, y, drawW, drawH)
       ctx.filter = 'none'
@@ -247,18 +388,19 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              ) : previewCompositing ? (
+              ) : appState.status === 'loading' ? (
                 <div className="relative h-full w-full">
                   <img
                     ref={imgRef}
-                    src={imgUrl}
+                    src={shadowUrl || cutoutUrl || imgUrl}
                     alt="preview"
                     className="h-full w-full object-contain"
                   />
                   <div className="absolute inset-0 bg-black/20 grid place-content-center">
                     <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                      仮合成中...
+                      {appState.phase === 'IDLE' ? '背景除去中...' : 
+                       appState.phase === 'PREVIEW' ? '仮合成中...' : '処理中...'}
                     </div>
                   </div>
                 </div>
@@ -266,19 +408,17 @@ export default function Home() {
                 <div className="relative h-full w-full">
                   <img
                     ref={imgRef}
-                    src={cutoutUrl || imgUrl}
+                    src={shadowUrl || cutoutUrl || imgUrl}
                     alt="preview"
                     className="h-full w-full object-contain"
-                    onLoad={() => drawComposite({ useCutout: !!cutoutUrl, bg })}
                   />
                   <div className="absolute top-2 left-2 bg-green-500/90 text-white px-3 py-1 rounded-lg text-xs">
                     {cutoutUrl ? '完成プレビュー' : 'こんな感じになります'}
                   </div>
-                  {processing && (
-                    <div className="absolute inset-0 bg-black/20 grid place-content-center">
-                      <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                        背景除去中...
+                  {appState.status === 'error' && (
+                    <div className="absolute inset-0 bg-red-500/20 grid place-content-center">
+                      <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-red-700">
+                        エラー: {appState.error}
                       </div>
                     </div>
                   )}
@@ -289,22 +429,28 @@ export default function Home() {
           
           <StepCard stepNumber={3} title="保存">
             <div className="mb-4">
-              {!finalImageGenerated ? (
+              {appState.phase === 'IDLE' || appState.phase === 'PREVIEW' ? (
                 <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
                   「作成！」ボタンを押すと最終画像を生成します
                 </div>
               ) : (
-                <canvas ref={canvasRef} className="max-w-full border rounded-xl"></canvas>
+                <canvas 
+                  ref={canvasRef} 
+                  className={clsx(
+                    "max-w-full border rounded-xl",
+                    appState.phase === 'FINAL_RENDERING' && "invisible"
+                  )}
+                />
               )}
             </div>
             
-            {!finalImageGenerated ? (
+            {appState.phase !== 'FINAL_READY' ? (
               <button 
                 className="btn btn-primary disabled:opacity-50" 
                 onClick={handleGenerateFinal} 
-                disabled={!bg || !cutoutUrl || isBusy}
+                disabled={!bg || !cutoutUrl || appState.phase === 'FINAL_RENDERING'}
               >
-                {isBusy ? '作成中...' : '作成！'}
+                {appState.phase === 'FINAL_RENDERING' ? '作成中...' : '作成！'}
               </button>
             ) : (
               <button className="btn btn-ghost" onClick={handleSave}>
@@ -397,10 +543,186 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
 }
 
 async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
+  console.log('toBase64Resized called:', {
+    src: imgEl.src.substring(0, 50) + '...',
+    naturalWidth: imgEl.naturalWidth,
+    naturalHeight: imgEl.naturalHeight,
+    complete: imgEl.complete
+  })
+
   const { naturalWidth:w, naturalHeight:h } = imgEl
   const scale = w>h ? maxSide/w : maxSide/h
   const rw = Math.round(w*scale), rh = Math.round(h*scale)
   const c = document.createElement('canvas'); c.width=rw; c.height=rh
   c.getContext('2d')!.drawImage(imgEl, 0,0,rw,rh)
-  return c.toDataURL('image/png')
+  
+  // blob URLの場合は元のファイル形式を保持する
+  if (imgEl.src.startsWith('blob:')) {
+    // blob URLから実際のファイルタイプを取得
+    try {
+      const response = await fetch(imgEl.src)
+      const blob = await response.blob()
+      const mimeType = blob.type
+      
+      console.log('Detected MIME type from blob:', mimeType)
+      
+      let result
+      if (mimeType === 'image/jpeg') {
+        result = c.toDataURL('image/jpeg', 0.9)
+      } else {
+        result = c.toDataURL('image/png')
+      }
+      
+      console.log('toBase64Resized result:', {
+        resultLength: result.length,
+        preview: result.substring(0, 50) + '...'
+      })
+      
+      return result
+    } catch (e) {
+      console.warn('Failed to detect image type from blob, defaulting to PNG', e)
+      const result = c.toDataURL('image/png')
+      console.log('toBase64Resized fallback result:', result.length)
+      return result
+    }
+  } else {
+    const result = c.toDataURL('image/png')
+    console.log('toBase64Resized non-blob result:', result.length)
+    return result
+  }
+}
+
+// New OpenCV-based shadow generation function
+type ShadowOptions = {
+  quality?: 'preview' | 'final'
+  placement?: {
+    scale?: number
+    rotate?: number
+    tx?: number
+    ty?: number
+  }
+  directionDeg?: number
+  distancePx?: number
+  preset?: 'soft' | 'hard' | 'fabric' | 'none'
+  blur?: number
+  opacity?: number
+}
+
+async function generateShadowOpenCV(cutoutBase64: string, options: ShadowOptions = {}, signal?: AbortSignal): Promise<string | null> {
+  try {
+    console.log('generateShadowOpenCV called with options:', options)
+    const response = await fetch('/api/generate-shadow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cutoutImageBase64: cutoutBase64,
+        options
+      }),
+      signal
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('generate-shadow HTTP error:', response.status, errorText)
+      return null
+    }
+
+    const data = await response.json()
+    
+    if (!data.ok) {
+      console.error('Shadow generation failed:', data.error)
+      return null
+    }
+    
+    // Debug logging
+    if (data.debug) {
+      console.log('Shadow generation debug:', data.debug)
+    }
+    if (data.lightSource) {
+      console.log('Light source detected:', data.lightSource)
+    }
+
+    // Convert base64 to blob URL for consistent usage
+    const shadowBase64 = data.shadowLayerBase64
+    if (!shadowBase64) {
+      console.error('No shadow layer returned')
+      return null
+    }
+
+    // Convert to blob URL
+    const base64Data = shadowBase64.replace(/^data:image\/[^;]+;base64,/, '')
+    const binaryData = atob(base64Data)
+    const bytes = new Uint8Array(binaryData.length)
+    
+    for (let i = 0; i < binaryData.length; i++) {
+      bytes[i] = binaryData.charCodeAt(i)
+    }
+    
+    const blob = new Blob([bytes], { type: 'image/png' })
+    return URL.createObjectURL(blob)
+
+  } catch (error: any) {
+    if (signal?.aborted) {
+      console.log('Shadow generation aborted')
+      return null
+    }
+    console.error('Shadow generation error:', error.message, error)
+    return null
+  }
+}
+
+// Enhanced version of enhanceWithShadow using new OpenCV pipeline
+async function enhanceWithShadowOpenCV(cutoutBase64: string, backgroundColor: string, updateState: boolean = false, options: ShadowOptions = {}): Promise<string> {
+  console.log('enhanceWithShadowOpenCV called', { backgroundColor, updateState, cutoutLength: cutoutBase64.length })
+  
+  try {
+    // Generate shadow layer
+    const shadowLayerUrl = await generateShadowOpenCV(cutoutBase64, options)
+    
+    if (!shadowLayerUrl) {
+      console.error('Failed to generate shadow layer, falling back to original')
+      return cutoutBase64
+    }
+
+    // Load both cutout and shadow images
+    const [cutoutImg, shadowImg] = await Promise.all([
+      loadImage(cutoutBase64),
+      loadImage(shadowLayerUrl)
+    ])
+
+    if (!cutoutImg || !shadowImg) {
+      console.error('Failed to load images for composition')
+      URL.revokeObjectURL(shadowLayerUrl)
+      return cutoutBase64
+    }
+
+    // Composite shadow + cutout on transparent background
+    const canvas = document.createElement('canvas')
+    canvas.width = cutoutImg.naturalWidth
+    canvas.height = cutoutImg.naturalHeight
+    const ctx = canvas.getContext('2d')!
+
+    // Draw shadow first (behind) - scale to match cutout size
+    ctx.drawImage(shadowImg, 0, 0, cutoutImg.naturalWidth, cutoutImg.naturalHeight)
+    
+    // Draw cutout on top
+    ctx.drawImage(cutoutImg, 0, 0)
+
+    // Clean up
+    URL.revokeObjectURL(shadowLayerUrl)
+
+    const compositeBase64 = canvas.toDataURL('image/png')
+
+    // Update state if requested
+    if (updateState) {
+      console.log('Updating shadowUrl state with OpenCV result')
+      // This will be handled by the calling code
+    }
+
+    return compositeBase64
+
+  } catch (error: any) {
+    console.error('enhanceWithShadowOpenCV error:', error.message, error)
+    return cutoutBase64 // Fallback to original
+  }
 }

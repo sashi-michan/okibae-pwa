@@ -66,19 +66,33 @@ async function callRemoveBg(imageBase64: string): Promise<string> {
   const key = process.env.REMOVE_BG_API_KEY
   if (!key) throw new Error('server token missing (REMOVE_BG_API_KEY)')
 
-  // data URL → 生のbase64に
-  const base64 = imageBase64.split(',')[1] || imageBase64
-  const blob = new Blob([Buffer.from(base64, 'base64')], { type: 'image/png' })
+  // data URL → 生のbase64だけに
+  const base64 = imageBase64.startsWith('data:')
+    ? (imageBase64.split(',')[1] ?? '')
+    : imageBase64
+
+  // デバッグログ追加
+  console.log('callRemoveBg input:', {
+    isDataUrl: imageBase64.startsWith('data:'),
+    inputLength: imageBase64.length,
+    base64Length: base64.length,
+    base64Preview: base64.substring(0, 50) + '...'
+  })
+
+  if (!base64 || base64.length === 0) {
+    throw new Error('Empty base64 data')
+  }
 
   const form = new FormData()
-  form.append('image_file', blob, 'image.png')
-  form.append('format', 'png') // 透過PNG
+  form.append('image_file_b64', base64) // ← ここポイント！prefixは付けない
+  form.append('format', 'png')          // 出力形式（入力の形式とは無関係）
 
   const resp = await fetch('https://api.remove.bg/v1.0/removebg', {
     method: 'POST',
     headers: { 'X-Api-Key': key },
-    body: form
+    body: form,
   })
+
   if (!resp.ok) {
     const text = await resp.text()
     throw new Error(`remove.bg error: ${resp.status} ${text}`)
