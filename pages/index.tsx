@@ -6,7 +6,7 @@ import StepCard from '../components/StepCard'
 type BgOption = 'white' | 'beige' | 'stripe'
 
 type AppState = {
-  phase: 'IDLE' | 'PREVIEW' | 'FINAL_RENDERING' | 'FINAL_READY'
+  phase: 'IDLE' | 'FINAL_RENDERING' | 'FINAL_READY'
   status?: 'loading' | 'error'
   error?: string
 }
@@ -15,8 +15,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
   const [cutoutUrl, setCutoutUrl] = useState<string>('')     // 透過PNG（切り抜き）
-  const [shadowUrl, setShadowUrl] = useState<string>('')    // 影付き画像（切り抜き+影）
-  const [bg, setBg] = useState<BgOption | null>(null)
+  const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
 
@@ -28,7 +27,6 @@ export default function Home() {
     const url = URL.createObjectURL(file)
     setImgUrl(url)
     setCutoutUrl('')
-    setShadowUrl('')
     setImageKey(String(Date.now()))
     
     // IDLE状態に設定（完全リセット）
@@ -37,41 +35,23 @@ export default function Home() {
     return () => URL.revokeObjectURL(url)
   }, [file])
 
-  // 司令塔useEffect - 全ての処理を一元管理
+  // 司令塔useEffect - 背景除去のみ自動実行
   useEffect(() => {
     const handleStateTransition = async () => {
-      console.log('State transition:', { phase: appState.phase, bg, cutoutUrl: !!cutoutUrl, shadowUrl: !!shadowUrl })
+      console.log('State transition:', { phase: appState.phase, cutoutUrl: !!cutoutUrl })
       
       switch (appState.phase) {
         case 'IDLE':
-          // 画像選択済み + 背景未選択の状態
-          // 背景除去の自動実行
+          // 画像選択済み時に背景除去を自動実行
           if (imgUrl && !cutoutUrl && imgRef.current && !appState.status) {
             console.log('Starting background removal')
             setAppState({ phase: 'IDLE', status: 'loading' })
             await ensureCutout()
           }
-          // 背景が選択されたらPREVIEWに移行
-          if (cutoutUrl && bg) {
-            console.log('Moving to PREVIEW phase')
-            setAppState({ phase: 'PREVIEW' })
-          }
-          break
-          
-        case 'PREVIEW':
-          // 軽量影生成 → プレビュー表示
-          if (cutoutUrl && bg && !shadowUrl && !appState.status) {
-            console.log('Starting preview shadow generation with OpenCV - quality: preview')
-            setAppState({ phase: 'PREVIEW', status: 'loading' })
-            const backgroundColor = getBackgroundColor(bg)
-            const enhancedUrl = await enhanceWithShadowOpenCV(cutoutUrl, backgroundColor, true, { quality: 'preview' })
-            setShadowUrl(enhancedUrl) // 手動で状態更新
-            setAppState({ phase: 'PREVIEW' }) // loading完了
-          }
           break
           
         case 'FINAL_RENDERING':
-          // 高品質影生成 + drawComposite → FINAL_READY
+          // AI影生成 + drawComposite → FINAL_READY
           console.log('FINAL_RENDERING condition check:', {
             cutoutUrl: !!cutoutUrl,
             bg: !!bg,
@@ -81,10 +61,11 @@ export default function Home() {
           })
           
           if (cutoutUrl && bg && canvasRef.current && !appState.status) {
-            console.log('Starting final rendering with OpenCV')
+            console.log('Starting final rendering with AI shadows')
             setAppState({ phase: 'FINAL_RENDERING', status: 'loading' })
+            // TODO: AI影生成実装予定（nano banana）
             const backgroundColor = getBackgroundColor(bg)
-            const enhancedUrl = await enhanceWithShadowOpenCV(cutoutUrl, backgroundColor, false, { quality: 'final' })
+            const enhancedUrl = await enhanceWithAIShadows(cutoutUrl, backgroundColor)
             await drawComposite({ bg, customCutoutUrl: enhancedUrl })
             setAppState({ phase: 'FINAL_READY' })
           }
@@ -98,14 +79,14 @@ export default function Home() {
     
     handleStateTransition()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appState.phase, bg, cutoutUrl, shadowUrl, imgUrl])
+  }, [appState.phase, cutoutUrl, imgUrl])
 
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) {
-      // プレビュー以降の状態で画像を選び直す場合は確認アラート
-      if (appState.phase === 'PREVIEW' || appState.phase === 'FINAL_RENDERING' || appState.phase === 'FINAL_READY') {
+      // 生成中または完了状態で画像を選び直す場合は確認アラート
+      if (appState.phase === 'FINAL_RENDERING' || appState.phase === 'FINAL_READY') {
         const confirmed = window.confirm('現在の変更が削除されます！')
         if (!confirmed) {
           // ファイル選択をリセット
@@ -176,18 +157,11 @@ export default function Home() {
       if (!confirmed) {
         return // 変更をキャンセル
       }
-      // プレビューに戻す
-      setShadowUrl('') // 影画像もクリア
+      // IDLE状態に戻す
+      setAppState({ phase: 'IDLE' })
     }
 
     setBg(next)
-    
-    // 状態遷移は司令塔useEffectが自動で処理
-    if (cutoutUrl) {
-      // 影画像をクリアしてから新しい背景でPREVIEWに移行
-      setShadowUrl('')
-      setAppState({ phase: 'PREVIEW' })
-    }
   }
 
   const ensureCutout = async () => {
@@ -356,103 +330,83 @@ export default function Home() {
               <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
               画像を選ぶ
             </label>
+            
+            {imgUrl && (
+              <div className="mt-4">
+                <div className="aspect-square w-full overflow-hidden rounded-xl border bg-gray-50">
+                  <div className="relative h-full w-full">
+                    <img
+                      ref={imgRef}
+                      src={imgUrl}
+                      alt="selected image"
+                      className="h-full w-full object-contain"
+                    />
+                    {appState.status === 'loading' && appState.phase === 'IDLE' && (
+                      <div className="absolute inset-0 bg-black/20 grid place-content-center">
+                        <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                          背景除去中...
+                        </div>
+                      </div>
+                    )}
+                    {appState.status === 'error' && (
+                      <div className="absolute inset-0 bg-red-500/20 grid place-content-center">
+                        <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-red-700">
+                          エラー: {appState.error}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </StepCard>
           
-          <StepCard stepNumber={2} title="背景を選んでプレビュー">
+          <StepCard stepNumber={2} title="背景を選んで生成">
+            <p className="mb-4 text-sm text-gray-600">
+              背景を選んで影付きの画像を生成します。
+            </p>
             <div className="mb-4 flex items-center gap-2">
               <BgBadge current={bg} value="white" label="白" onClick={handleBgPreset} />
               <BgBadge current={bg} value="beige" label="ベージュ" onClick={handleBgPreset} />
               <BgBadge current={bg} value="stripe" label="布っぽい" onClick={handleBgPreset} />
             </div>
             
-            <div className={clsx("aspect-square w-full overflow-hidden rounded-xl border")}
-              style={bg === 'stripe'
-                ? { backgroundImage: 'repeating-linear-gradient(180deg,#FAF9F6 0px,#FAF9F6 8px,#F2ECE4 8px,#F2ECE4 16px)' }
-                : bg === 'white' ? { backgroundColor: '#FFFFFF' } 
-                : bg === 'beige' ? { backgroundColor: '#F4EDE4' }
-                : { backgroundColor: '#F9F9F9' }
-              }>
-              {!imgUrl ? (
-                <div className="h-full w-full grid place-content-center text-gray-400 text-sm">画像を選ぶとここに表示されます</div>
-              ) : !bg ? (
-                <div className="relative h-full w-full">
-                  <img
-                    ref={imgRef}
-                    src={imgUrl}
-                    alt="preview"
-                    className="h-full w-full object-contain"
-                  />
-                  <div className="absolute inset-0 bg-black/10 grid place-content-center">
-                    <div className="bg-white/90 px-4 py-2 rounded-lg text-sm text-gray-700">
-                      背景を選ぶと加工されます
-                    </div>
-                  </div>
-                </div>
-              ) : appState.status === 'loading' ? (
-                <div className="relative h-full w-full">
-                  <img
-                    ref={imgRef}
-                    src={shadowUrl || cutoutUrl || imgUrl}
-                    alt="preview"
-                    className="h-full w-full object-contain"
-                  />
-                  <div className="absolute inset-0 bg-black/20 grid place-content-center">
-                    <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-gray-700 flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                      {appState.phase === 'IDLE' ? '背景除去中...' : 
-                       appState.phase === 'PREVIEW' ? '仮合成中...' : '処理中...'}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative h-full w-full">
-                  <img
-                    ref={imgRef}
-                    src={shadowUrl || cutoutUrl || imgUrl}
-                    alt="preview"
-                    className="h-full w-full object-contain"
-                  />
-                  <div className="absolute top-2 left-2 bg-green-500/90 text-white px-3 py-1 rounded-lg text-xs">
-                    {cutoutUrl ? '完成プレビュー' : 'こんな感じになります'}
-                  </div>
-                  {appState.status === 'error' && (
-                    <div className="absolute inset-0 bg-red-500/20 grid place-content-center">
-                      <div className="bg-white/95 px-6 py-3 rounded-lg text-sm text-red-700">
-                        エラー: {appState.error}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </StepCard>
-          
-          <StepCard stepNumber={3} title="保存">
-            <div className="mb-4">
-              {appState.phase === 'IDLE' || appState.phase === 'PREVIEW' ? (
-                <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
-                  「作成！」ボタンを押すと最終画像を生成します
-                </div>
-              ) : (
-                <canvas 
-                  ref={canvasRef} 
-                  className={clsx(
-                    "max-w-full border rounded-xl",
-                    appState.phase === 'FINAL_RENDERING' && "invisible"
-                  )}
-                />
-              )}
-            </div>
-            
             {appState.phase !== 'FINAL_READY' ? (
               <button 
                 className="btn btn-primary disabled:opacity-50" 
                 onClick={handleGenerateFinal} 
-                disabled={!bg || !cutoutUrl || appState.phase === 'FINAL_RENDERING'}
+                disabled={!cutoutUrl || appState.phase === 'FINAL_RENDERING'}
               >
-                {appState.phase === 'FINAL_RENDERING' ? '作成中...' : '作成！'}
+                {appState.phase === 'FINAL_RENDERING' ? '生成中...' : 'AI影付き画像を生成！'}
               </button>
             ) : (
+              <div className="text-sm text-green-600">✓ 生成完了</div>
+            )}
+          </StepCard>
+          
+          <StepCard stepNumber={3} title="保存">
+            <div className="mb-4">
+              {appState.phase === 'IDLE' ? (
+                <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
+                  生成ボタンを押すと最終画像がここに表示されます
+                </div>
+              ) : appState.phase === 'FINAL_RENDERING' ? (
+                <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <div className="text-sm text-gray-600">AI影生成中...</div>
+                  </div>
+                </div>
+              ) : (
+                <canvas 
+                  ref={canvasRef} 
+                  className="max-w-full border rounded-xl"
+                />
+              )}
+            </div>
+            
+            {appState.phase === 'FINAL_READY' && (
               <button className="btn btn-ghost" onClick={handleSave}>
                 画像をダウンロード
               </button>
@@ -671,58 +625,30 @@ async function generateShadowOpenCV(cutoutBase64: string, options: ShadowOptions
   }
 }
 
-// Enhanced version of enhanceWithShadow using new OpenCV pipeline
-async function enhanceWithShadowOpenCV(cutoutBase64: string, backgroundColor: string, updateState: boolean = false, options: ShadowOptions = {}): Promise<string> {
-  console.log('enhanceWithShadowOpenCV called', { backgroundColor, updateState, cutoutLength: cutoutBase64.length })
+// AI-powered shadow generation using nano banana or similar models
+async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: string): Promise<string> {
+  console.log('enhanceWithAIShadows called', { backgroundColor, cutoutLength: cutoutBase64.length })
   
   try {
-    // Generate shadow layer
-    const shadowLayerUrl = await generateShadowOpenCV(cutoutBase64, options)
+    // TODO: Implement nano banana AI shadow generation
+    // For now, return the original cutout as fallback
+    console.log('AI shadow generation - TODO: implement nano banana')
     
-    if (!shadowLayerUrl) {
-      console.error('Failed to generate shadow layer, falling back to original')
-      return cutoutBase64
-    }
-
-    // Load both cutout and shadow images
-    const [cutoutImg, shadowImg] = await Promise.all([
-      loadImage(cutoutBase64),
-      loadImage(shadowLayerUrl)
-    ])
-
-    if (!cutoutImg || !shadowImg) {
-      console.error('Failed to load images for composition')
-      URL.revokeObjectURL(shadowLayerUrl)
-      return cutoutBase64
-    }
-
-    // Composite shadow + cutout on transparent background
-    const canvas = document.createElement('canvas')
-    canvas.width = cutoutImg.naturalWidth
-    canvas.height = cutoutImg.naturalHeight
-    const ctx = canvas.getContext('2d')!
-
-    // Draw shadow first (behind) - scale to match cutout size
-    ctx.drawImage(shadowImg, 0, 0, cutoutImg.naturalWidth, cutoutImg.naturalHeight)
+    // Placeholder: In the future, this will call nano banana API
+    // const aiResult = await fetch('/api/ai-shadows', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     cutoutImageBase64: cutoutBase64,
+    //     backgroundColor,
+    //     model: 'nano-banana'
+    //   })
+    // })
     
-    // Draw cutout on top
-    ctx.drawImage(cutoutImg, 0, 0)
-
-    // Clean up
-    URL.revokeObjectURL(shadowLayerUrl)
-
-    const compositeBase64 = canvas.toDataURL('image/png')
-
-    // Update state if requested
-    if (updateState) {
-      console.log('Updating shadowUrl state with OpenCV result')
-      // This will be handled by the calling code
-    }
-
-    return compositeBase64
+    return cutoutBase64 // Temporary fallback
 
   } catch (error: any) {
-    console.error('enhanceWithShadowOpenCV error:', error.message, error)
+    console.error('enhanceWithAIShadows error:', error.message, error)
     return cutoutBase64 // Fallback to original
   }
 }

@@ -15,6 +15,28 @@ secrets/
 # public originals
 public/originals/
 
+# Python debug and test files (archived versions are preserved)
+python/debug_*.py
+python/test_*.py
+python/*_debug.log
+python/debug_output*/
+python/debug_steps*/
+shadow_*.png
+debug_*.png
+*_debug.png
+*_test.png
+
+# Development files
+start-dev-*.ps1
+server-*.log
+*.pid.txt
+NUL
+
+# Cache and temporary files
+python/__pycache__/
+*.pyc
+*.pyo
+
 # misc
 .DS_Store
 *.local
