@@ -3,19 +3,21 @@ import clsx from 'clsx'
 import Stepper from '../components/Stepper'
 import StepCard from '../components/StepCard'
 
-type BgOption = 'white' | 'beige' | 'stripe'
+type BgOption = 'white' | 'linen' | 'concrete'
+type WeatherOption = 'sunny' | 'cloudy' | 'rainy'
 
 type AppState = {
   phase: 'IDLE' | 'FINAL_RENDERING' | 'FINAL_READY'
   status?: 'loading' | 'error'
   error?: string
+  finalImageUrl?: string
 }
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
-  const [cutoutUrl, setCutoutUrl] = useState<string>('')     // 透過PNG（切り抜き）
   const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
+  const [weather, setWeather] = useState<WeatherOption>('sunny') // デフォルト天気を晴れに設定
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
 
@@ -26,7 +28,6 @@ export default function Home() {
     if (!file) return
     const url = URL.createObjectURL(file)
     setImgUrl(url)
-    setCutoutUrl('')
     setImageKey(String(Date.now()))
     
     // IDLE状態に設定（完全リセット）
@@ -38,48 +39,92 @@ export default function Home() {
   // 司令塔useEffect - 背景除去のみ自動実行
   useEffect(() => {
     const handleStateTransition = async () => {
-      console.log('State transition:', { phase: appState.phase, cutoutUrl: !!cutoutUrl })
+      console.log('State transition:', { phase: appState.phase, imgUrl: !!imgUrl })
       
       switch (appState.phase) {
         case 'IDLE':
-          // 画像選択済み時に背景除去を自動実行
-          if (imgUrl && !cutoutUrl && imgRef.current && !appState.status) {
-            console.log('Starting background removal')
-            setAppState({ phase: 'IDLE', status: 'loading' })
-            await ensureCutout()
-          }
+          // nano banana使用のため、背景除去は不要
           break
           
         case 'FINAL_RENDERING':
           // AI影生成 + drawComposite → FINAL_READY
           console.log('FINAL_RENDERING condition check:', {
-            cutoutUrl: !!cutoutUrl,
+            imgUrl: !!imgUrl,
             bg: !!bg,
             canvasRef: !!canvasRef.current,
             noStatus: !appState.status,
             currentStatus: appState.status
           })
           
-          if (cutoutUrl && bg && canvasRef.current && !appState.status) {
+          if (imgUrl && bg && !appState.status) {
             console.log('Starting final rendering with AI shadows')
             setAppState({ phase: 'FINAL_RENDERING', status: 'loading' })
             // TODO: AI影生成実装予定（nano banana）
             const backgroundColor = getBackgroundColor(bg)
-            const enhancedUrl = await enhanceWithAIShadows(cutoutUrl, backgroundColor)
-            await drawComposite({ bg, customCutoutUrl: enhancedUrl })
-            setAppState({ phase: 'FINAL_READY' })
+            // Convert imgUrl (blob) to base64 for nano banana
+            const img = await loadImage(imgUrl)
+            const base64 = await toBase64Resized(img, 1536)
+            const enhancedUrl = await enhanceWithAIShadows(base64, backgroundColor, weather)
+            
+            // nano banana結果をstateに保存してFINAL_READYで描画
+            setAppState({ phase: 'FINAL_READY', finalImageUrl: enhancedUrl })
           }
           break
           
         case 'FINAL_READY':
-          // 完了状態、追加処理なし
+          // nano banana結果をキャンバスに描画
+          if (canvasRef.current && appState.finalImageUrl && !appState.status) {
+            console.log('Drawing final image to canvas', { 
+              finalImageUrl: appState.finalImageUrl.substring(0, 100) + '...',
+              isDataUrl: appState.finalImageUrl.startsWith('data:')
+            })
+            const canvas = canvasRef.current
+            const ctx = canvas.getContext('2d')!
+            
+            // キャンバスサイズ設定
+            const outW = 1200, outH = 1200
+            canvas.width = outW; canvas.height = outH
+            
+            // nano banana結果画像を読み込み
+            const img = await loadImage(appState.finalImageUrl)
+            if (img) {
+              // アスペクト比を保持して中央に配置
+              ctx.clearRect(0, 0, outW, outH)
+              
+              const imgAspect = img.naturalWidth / img.naturalHeight
+              const canvasAspect = outW / outH
+              
+              let drawW, drawH, drawX, drawY
+              
+              if (imgAspect > canvasAspect) {
+                // 横長の画像：幅に合わせる
+                drawW = outW
+                drawH = outW / imgAspect
+                drawX = 0
+                drawY = (outH - drawH) / 2
+              } else {
+                // 縦長の画像：高さに合わせる
+                drawW = outH * imgAspect
+                drawH = outH
+                drawX = (outW - drawW) / 2
+                drawY = 0
+              }
+              
+              ctx.drawImage(img, drawX, drawY, drawW, drawH)
+              console.log('Nano banana result drawn with aspect ratio preserved', { 
+                original: { w: img.naturalWidth, h: img.naturalHeight },
+                canvas: { w: outW, h: outH },
+                draw: { x: drawX, y: drawY, w: drawW, h: drawH }
+              })
+            }
+          }
           break
       }
     }
     
     handleStateTransition()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appState.phase, cutoutUrl, imgUrl])
+  }, [appState.phase, imgUrl])
 
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,8 +148,8 @@ export default function Home() {
   const getBackgroundColor = (bg: BgOption): string => {
     switch (bg) {
       case 'white': return '#FFFFFF'
-      case 'beige': return '#F4EDE4'
-      case 'stripe': return '#FAF9F6' // 布っぽい背景の基調色
+      case 'linen': return '#F4EDE4'
+      case 'concrete': return '#FAF9F6' // コンクリート背景の基調色
       default: return '#FFFFFF'
     }
   }
@@ -137,11 +182,7 @@ export default function Home() {
         return cutoutBase64 // フォールバック：元の画像を返す
       }
       
-      // 状態更新フラグが有効な場合、shadowUrlを更新
-      if (updateState) {
-        console.log('Updating shadowUrl state')
-        setShadowUrl(data.enhancedImageBase64)
-      }
+      // 状態更新フラグが有効な場合の処理（nano banana使用のため不要）
       
       return data.enhancedImageBase64
     } catch (e: any) {
@@ -164,63 +205,25 @@ export default function Home() {
     setBg(next)
   }
 
-  const ensureCutout = async () => {
-    if (cutoutUrl || !imgRef.current) return
-    const myKey = imageKey
-    
-    try {
-      // 画像の読み込み完了を待つ
-      const img = imgRef.current
-      if (!img.complete || img.naturalWidth === 0) {
-        console.log('Waiting for image to load...')
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Image load timeout'))
-          }, 10000) // 10秒タイムアウト
-          
-          img.onload = () => {
-            clearTimeout(timeout)
-            console.log('Image loaded:', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight })
-            resolve()
-          }
-          img.onerror = () => {
-            clearTimeout(timeout)
-            reject(new Error('Image load failed'))
-          }
-          
-          // 既に読み込まれている場合
-          if (img.complete && img.naturalWidth > 0) {
-            clearTimeout(timeout)
-            resolve()
-          }
-        })
+  const handleWeatherPreset = async (next: WeatherOption) => {
+    // 最終画像生成済みの場合は確認ダイアログを表示
+    if (appState.phase === 'FINAL_READY') {
+      const confirmed = window.confirm('最終画像をクリアします！')
+      if (!confirmed) {
+        return // 変更をキャンセル
       }
-      
-      const base64 = await toBase64Resized(img, 1536)
-      const resp = await fetch('/api/remove-bg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64 })
-      })
-      const data = await resp.json()
-      if (myKey !== imageKey) return
-      if (!data.ok) {
-        console.error('背景消し失敗:', data.error || 'unknown')
-        setAppState({ phase: 'IDLE', status: 'error', error: data.error || '背景除去に失敗しました' })
-        return
-      }
-      setCutoutUrl(data.pngBase64)
-      setAppState({ phase: 'IDLE' }) // loading完了
-    } catch (e:any) {
-      console.error('remove-bg error:', e.message)
-      setAppState({ phase: 'IDLE', status: 'error', error: '背景除去でエラーが発生しました' })
+      // IDLE状態に戻す
+      setAppState({ phase: 'IDLE' })
     }
+
+    setWeather(next)
   }
 
+
   const handleGenerateFinal = async () => {
-    console.log('handleGenerateFinal called', { phase: appState.phase, bg, cutoutUrl })
-    if (!bg || !cutoutUrl) {
-      console.log('Missing bg or cutoutUrl, returning')
+    console.log('handleGenerateFinal called', { phase: appState.phase, bg, weather, imgUrl: !!imgUrl })
+    if (!bg || !weather || !imgUrl) {
+      console.log('Missing bg, weather, or imgUrl, returning')
       return
     }
     
@@ -252,8 +255,8 @@ export default function Home() {
     drawBackground(ctx, outW, outH, bg)
     console.log('Background drawn')
 
-    const src = customCutoutUrl || cutoutUrl || imgUrl
-    console.log('Image source determined', { src: src ? 'data:...' : 'null', cutoutUrl: cutoutUrl ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
+    const src = customCutoutUrl || imgUrl
+    console.log('Image source determined', { src: src ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
     if (!src) {
       console.log('No src, returning')
       return
@@ -282,7 +285,7 @@ export default function Home() {
     const x = Math.round((outW - drawW) / 2)  // 中央寄せ
     const y = Math.round((outH - drawH) / 2)
 
-    if (cutoutUrl) {
+    if (customCutoutUrl) {
       console.log('Drawing with cutout image (OpenCV shadows)')
       // OpenCV影統一なので自前影は削除済み
       ctx.filter = 'brightness(1.06) contrast(1.08)'
@@ -362,30 +365,33 @@ export default function Home() {
             )}
           </StepCard>
           
-          <StepCard stepNumber={2} title="背景を選んで生成">
-            <p className="mb-4 text-sm text-gray-600">
-              背景を選んで影付きの画像を生成します。
-            </p>
-            <div className="mb-4 flex items-center gap-2">
-              <BgBadge current={bg} value="white" label="白" onClick={handleBgPreset} />
-              <BgBadge current={bg} value="beige" label="ベージュ" onClick={handleBgPreset} />
-              <BgBadge current={bg} value="stripe" label="布っぽい" onClick={handleBgPreset} />
+          <StepCard stepNumber={2} title="背景を選ぶ">
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-6">お好みの背景を選んでください</p>
+              <BackgroundCarousel current={bg} onChange={handleBgPreset} />
             </div>
-            
-            {appState.phase !== 'FINAL_READY' ? (
-              <button 
-                className="btn btn-primary disabled:opacity-50" 
-                onClick={handleGenerateFinal} 
-                disabled={!cutoutUrl || appState.phase === 'FINAL_RENDERING'}
-              >
-                {appState.phase === 'FINAL_RENDERING' ? '生成中...' : 'AI影付き画像を生成！'}
-              </button>
-            ) : (
-              <div className="text-sm text-green-600">✓ 生成完了</div>
-            )}
           </StepCard>
           
-          <StepCard stepNumber={3} title="保存">
+          <StepCard stepNumber={3} title="天気を選ぶ">
+            <div className="mb-4 flex items-center gap-2">
+              <WeatherBadge current={weather} value="sunny" label="晴れ" onClick={handleWeatherPreset} />
+              <WeatherBadge current={weather} value="cloudy" label="くもり" onClick={handleWeatherPreset} />
+              <WeatherBadge current={weather} value="rainy" label="雨" onClick={handleWeatherPreset} />
+            </div>
+          </StepCard>
+          
+          <StepCard stepNumber={4} title="保存">
+            {appState.phase !== 'FINAL_READY' ? (
+              <button 
+                className="btn btn-primary disabled:opacity-50 mb-4" 
+                onClick={handleGenerateFinal} 
+                disabled={!imgUrl || appState.phase === 'FINAL_RENDERING'}
+              >
+                {appState.phase === 'FINAL_RENDERING' ? '生成中...' : '生成！'}
+              </button>
+            ) : (
+              <div className="text-sm text-green-600 mb-4">✓ 生成完了</div>
+            )}
             <div className="mb-4">
               {appState.phase === 'IDLE' ? (
                 <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
@@ -395,7 +401,7 @@ export default function Home() {
                 <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center">
                   <div className="text-center">
                     <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    <div className="text-sm text-gray-600">AI影生成中...</div>
+                    <div className="text-sm text-gray-600">生成中...</div>
                   </div>
                 </div>
               ) : (
@@ -418,7 +424,108 @@ export default function Home() {
   )
 }
 
-function BgBadge({ current, value, label, onClick }:{ current: BgOption | null, value: BgOption, label: string, onClick: (v: BgOption)=>void | Promise<void> }) {
+// スワイプ対応のカルーセル形式背景選択コンポーネント
+function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange: (value: BgOption) => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  
+  const backgrounds: Array<{ value: BgOption; label: string; image: string }> = [
+    { value: 'white', label: '白い水彩紙', image: '/input_image/sample_white.jpeg' },
+    { value: 'linen', label: 'リネン布', image: '/input_image/sample_linen.jpeg' },
+    { value: 'concrete', label: 'コンクリート', image: '/input_image/sample_concrete.jpeg' }
+  ]
+
+  // current値からindexを初期化
+  useEffect(() => {
+    const index = backgrounds.findIndex(bg => bg.value === current)
+    if (index !== -1) setCurrentIndex(index)
+  }, [current])
+
+  const handleSwipe = (direction: 'prev' | 'next') => {
+    let newIndex = currentIndex
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : backgrounds.length - 1
+    } else {
+      newIndex = currentIndex < backgrounds.length - 1 ? currentIndex + 1 : 0
+    }
+    setCurrentIndex(newIndex)
+    onChange(backgrounds[newIndex].value)
+  }
+
+  const currentBg = backgrounds[currentIndex]
+
+  return (
+    <div className="relative flex items-center justify-center">
+      {/* 左スワイプボタン */}
+      <button
+        onClick={() => handleSwipe('prev')}
+        className="absolute left-0 z-10 p-2 rounded-full bg-white shadow-lg border hover:bg-gray-50 transition-colors"
+        aria-label="前の背景"
+      >
+        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* メイン表示カード */}
+      <div className="mx-12">
+        <div className="group relative overflow-hidden rounded-2xl transition-all duration-300 border-2 border-brand-500 shadow-xl">
+          {/* プレビュー画像 */}
+          <div className="w-48 h-48 relative">
+            <img 
+              src={currentBg.image}
+              alt={`${currentBg.label}の背景`}
+              className="w-full h-full object-cover"
+            />
+            {/* オーバーレイ */}
+            <div className="absolute inset-0 bg-brand-500/10" />
+            
+            {/* 選択アイコン */}
+            <div className="absolute top-3 right-3 w-6 h-6 bg-brand-500 rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+          
+          {/* ラベル */}
+          <div className="px-6 py-4 text-center bg-brand-50">
+            <h3 className="text-lg font-medium text-brand-600">{currentBg.label}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* 右スワイプボタン */}
+      <button
+        onClick={() => handleSwipe('next')}
+        className="absolute right-0 z-10 p-2 rounded-full bg-white shadow-lg border hover:bg-gray-50 transition-colors"
+        aria-label="次の背景"
+      >
+        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      {/* インジケーター */}
+      <div className="absolute bottom-[-40px] flex gap-2 justify-center">
+        {backgrounds.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => {
+              setCurrentIndex(index)
+              onChange(backgrounds[index].value)
+            }}
+            className={clsx(
+              "w-2 h-2 rounded-full transition-colors",
+              index === currentIndex ? "bg-brand-500" : "bg-gray-300"
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WeatherBadge({ current, value, label, onClick }:{ current: WeatherOption | null, value: WeatherOption, label: string, onClick: (v: WeatherOption)=>void | Promise<void> }) {
   const active = current === value
   return (
     <button
@@ -433,7 +540,7 @@ function BgBadge({ current, value, label, onClick }:{ current: BgOption | null, 
 function drawBackground(ctx: CanvasRenderingContext2D, w:number, h:number, bg: BgOption) {
   if (bg === 'white') {
     ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,w,h)
-  } else if (bg === 'beige') {
+  } else if (bg === 'linen') {
     ctx.fillStyle = '#F4EDE4'; ctx.fillRect(0,0,w,h)
   } else {
     const tile = document.createElement('canvas')
@@ -625,30 +732,67 @@ async function generateShadowOpenCV(cutoutBase64: string, options: ShadowOptions
   }
 }
 
-// AI-powered shadow generation using nano banana or similar models
-async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: string): Promise<string> {
-  console.log('enhanceWithAIShadows called', { backgroundColor, cutoutLength: cutoutBase64.length })
+// AI-powered shadow generation using nano banana (Gemini 2.5 Flash Image Preview)
+async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: string, weather: WeatherOption): Promise<string> {
+  console.log('enhanceWithAIShadows called with nano banana', { backgroundColor, weather, cutoutLength: cutoutBase64.length })
   
   try {
-    // TODO: Implement nano banana AI shadow generation
-    // For now, return the original cutout as fallback
-    console.log('AI shadow generation - TODO: implement nano banana')
+    // Convert backgroundColor to style mapping
+    const styleMap: Record<string, string> = {
+      '#FFFFFF': 'white',
+      '#F4EDE4': 'linen', 
+      '#FAF9F6': 'concrete'
+    }
+    const style = styleMap[backgroundColor] || 'white'
     
-    // Placeholder: In the future, this will call nano banana API
-    // const aiResult = await fetch('/api/ai-shadows', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     cutoutImageBase64: cutoutBase64,
-    //     backgroundColor,
-    //     model: 'nano-banana'
-    //   })
-    // })
+    console.log(`Using AI shadow generation with style: ${style}, weather: ${weather}`)
     
-    return cutoutBase64 // Temporary fallback
+    // Convert base64 to blob for form data
+    const base64Data = cutoutBase64.replace(/^data:image\/[^;]+;base64,/, '')
+    const binaryData = atob(base64Data)
+    const bytes = new Uint8Array(binaryData.length)
+    
+    for (let i = 0; i < binaryData.length; i++) {
+      bytes[i] = binaryData.charCodeAt(i)
+    }
+    
+    const blob = new Blob([bytes], { type: 'image/png' })
+    
+    // Create form data
+    const formData = new FormData()
+    formData.append('file', blob, 'cutout.png')
+    formData.append('style', style)
+    formData.append('weather', weather)
+    
+    console.log('Calling nano banana API...')
+    
+    // Call our AI shadows API
+    const response = await fetch('/api/ai-shadows', {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('AI shadows API error:', response.status, errorText)
+      throw new Error(`AI API failed: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    
+    if (!result.ok) {
+      console.error('AI shadows generation failed:', result.error)
+      throw new Error(result.error || 'AI generation failed')
+    }
+    
+    console.log('AI shadows generation successful')
+    
+    // Return the generated image base64
+    return result.imageBase64
 
   } catch (error: any) {
     console.error('enhanceWithAIShadows error:', error.message, error)
-    return cutoutBase64 // Fallback to original
+    // Fallback to original cutout if AI fails
+    return cutoutBase64
   }
 }

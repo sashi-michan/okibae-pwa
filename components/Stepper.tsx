@@ -5,8 +5,9 @@ interface StepperProps {
 export default function Stepper({ currentStep }: StepperProps) {
   const steps = [
     { number: 1, title: '画像を選ぶ' },
-    { number: 2, title: '背景を選んでプレビュー' },
-    { number: 3, title: '保存' }
+    { number: 2, title: '背景を選ぶ' },
+    { number: 3, title: '天気を選ぶ' },
+    { number: 4, title: '保存' }
   ]
 
   return (
