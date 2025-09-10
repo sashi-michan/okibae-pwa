@@ -1,11 +1,96 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* カスタムCSS変数 */
 :root { --bg: #fff; }
+
+/* 基本スタイル */
 html, body, #__next { height: 100%; }
-body { @apply bg-cream text-gray-800; font-feature-settings: "palt" 1; }
-.btn { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 font-medium shadow-soft transition; }
-.btn-primary { @apply bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600; }
-.btn-ghost { @apply bg-white hover:bg-gray-50 border border-gray-200; }
-.card { @apply bg-white rounded-2xl shadow-soft p-4 md:p-6; }
+body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1; }
+
+/* タイポグラフィ - 可愛いフォント設定 */
+.typography-main-title { @apply text-xl md:text-2xl font-bold tracking-wide font-cute text-gray-800; }
+.typography-subtitle { @apply text-sm md:text-base font-medium font-cute text-gray-500; }
+.typography-step-title { @apply text-lg font-semibold font-cute text-gray-700; }
+.typography-body { @apply text-sm text-gray-500 font-cute; }
+.typography-label { @apply text-lg font-medium font-cute text-gray-700; }
+.typography-button { @apply font-cute text-gray-600; }
+.typography-nav-logo { @apply font-bold font-cute text-gray-800; }
+.typography-nav-menu { @apply text-sm font-cute text-gray-600; }
+
+/* コンポーネント */
+.btn { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button transform hover:scale-[1.02] hover:shadow-lg; }
+.btn-primary { @apply bg-gradient-to-r from-brand-500 to-brand-600 text-white hover:from-brand-400 hover:to-brand-500 active:from-brand-600 active:to-brand-700; }
+.btn-ghost { @apply bg-gradient-to-b from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 border border-gray-200 hover:border-gray-300; }
+.card { @apply bg-gradient-to-br from-white via-white to-gray-50/30 rounded-3xl shadow-soft border border-gray-100/50 p-6 md:p-8 backdrop-blur-sm; }
 .badge { @apply inline-flex items-center gap-1 rounded-full bg-pink-50 text-pink-700 px-3 py-1 text-xs; }
+
+/* 共通UIパターン */
+.icon-badge { @apply inline-flex items-center justify-center text-white font-cute transition-all duration-300 transform hover:scale-110 shadow-sm; }
+.icon-badge-sm { @apply h-6 w-6 rounded-full text-xs font-medium; }
+.icon-badge-md { @apply h-8 w-8 rounded-xl; }
+.stepper-badge { @apply flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium font-cute text-white shadow-sm transition-all duration-200; }
+.placeholder-area { @apply aspect-square w-full border-2 border-dashed border-gray-200/60 rounded-2xl grid place-content-center transition-all duration-300 hover:border-brand-200/60 hover:bg-brand-50/20 hover:shadow-md; }
+.loading-spinner { @apply w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin drop-shadow-sm; }
+.status-success { @apply text-emerald-500 font-medium; }
+.status-loading { @apply text-gray-400; }
+
+/* アニメーション強化 */
+.animate-gentle-bounce { animation: gentleBounce 0.6s ease-out; }
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+.animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.25, 0.46, 0.25, 1); }
+.animate-slide-in-left { animation: slideInLeft 0.35s cubic-bezier(0.25, 0.46, 0.25, 1); }
+
+@keyframes gentleBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(calc(100% + 48px)); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(calc(-100% - 48px)); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - 48px)); }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(100% + 48px)); }
+}
+
+.animate-slide-out-left { animation: slideOutLeft 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards; }
+.animate-slide-out-right { animation: slideOutRight 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards; }
+
+/* 高級感のある影 */
+.shadow-premium { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04); }
+.shadow-premium-hover { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 6px 20px rgba(0, 0, 0, 0.06); }
+
+/* インタラクティブ要素 */
+.interactive-card { 
+  @apply transition-all duration-300 hover:-translate-y-1; 
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.interactive-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+.glass-effect { @apply backdrop-blur-md bg-white/80 border border-white/20; }

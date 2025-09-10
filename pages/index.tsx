@@ -312,11 +312,12 @@ export default function Home() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-wide">OKIBAE — おしゃれな置き画を、かんたんに</h1>
+        <h1 className="typography-main-title">OKIBAE</h1>
+        <p className="typography-subtitle mt-1">おしゃれな置き画を、かんたんに</p>
       </div>
       
       <div className="grid lg:grid-cols-[260px_1fr] gap-6">
-        <div className="lg:block hidden">
+        <div className="lg:block hidden mt-6">
           <Stepper currentStep={1} />
         </div>
         
