@@ -1,0 +1,110 @@
+{
+  "test_summary": {
+    "mask_shape": [
+      400,
+      400
+    ],
+    "mask_pixels": 23074,
+    "v3_contact_points": 400,
+    "contact_mask_pixels": 9,
+    "test_angles": [
+      90,
+      135,
+      180,
+      225
+    ],
+    "max_distance": 100
+  },
+  "v3_contact_points": [
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    },
+    {
+      "y": 0.0,
+      "x": 0.0
+    }
+  ],
+  "shadow_comparison": {
+    "90": {
+      "no_contact": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      },
+      "with_v3": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      }
+    },
+    "135": {
+      "no_contact": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      },
+      "with_v3": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      }
+    },
+    "180": {
+      "no_contact": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      },
+      "with_v3": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      }
+    },
+    "225": {
+      "no_contact": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      },
+      "with_v3": {
+        "max": 0.0,
+        "pixels": 0,
+        "mean": 0
+      }
+    }
+  }
+}

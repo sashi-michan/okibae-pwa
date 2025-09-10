@@ -94,3 +94,104 @@ body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 6px 20px rgba(0, 0, 0, 0.06);
 }
 .glass-effect { @apply backdrop-blur-md bg-white/80 border border-white/20; }
+
+/* カルーセル実装（参考サイトベース） */
+.slick-container {
+  @apply relative w-full max-w-2xl mx-auto py-8;
+}
+
+.slick-carousel {
+  @apply relative w-full overflow-hidden;
+  height: 320px; /* 1:1 + パディング用に少し余裕 */
+}
+
+.slick-track {
+  @apply flex transition-transform duration-500 ease-out items-center;
+  height: 100%;
+}
+
+.slick-slide {
+  @apply flex-shrink-0 flex items-center justify-center;
+  width: 33.333%; /* 3つ表示用 */
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.slick-slide-content {
+  @apply relative aspect-square w-full max-w-xs; /* 1:1比率を強制 */
+}
+
+.slick-slide-image {
+  @apply w-full h-full object-cover rounded-xl;
+  opacity: 0.4;
+  transition: opacity 0.5s ease, transform 0.3s ease;
+}
+
+.slick-slide:hover .slick-slide-image {
+  opacity: 0.7;
+  transform: scale(1.02);
+}
+
+/* 中央のアクティブスライド */
+.slick-center .slick-slide-image {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+/* ナビゲーション矢印 - ミニマルデザイン */
+.slick-arrow {
+  @apply absolute z-20 p-2 transition-all duration-200 text-gray-400 hover:text-gray-600 hover:scale-110;
+  background: none;
+  border: none;
+  top: 42% !important;
+  transform: translateY(-50%);
+}
+
+.slick-arrow:hover {
+  top: 42% !important;
+}
+
+.slick-prev {
+  @apply -left-6;
+}
+
+.slick-next {
+  @apply -right-6;
+}
+
+/* ドットインジケーター */
+.slick-dots {
+  @apply flex justify-center gap-2 mt-6;
+}
+
+.slick-dot {
+  @apply w-3 h-3 rounded-full bg-gray-300 transition-all duration-200 hover:bg-gray-400;
+}
+
+.slick-dot.slick-active {
+  @apply bg-brand-500 w-8;
+}
+
+/* ラベル表示 */
+.slick-label {
+  @apply mt-4 text-center;
+}
+
+/* レスポンシブ対応 */
+@media screen and (max-width: 640px) {
+  .slick-container {
+    @apply max-w-sm;
+  }
+  
+  .slick-arrow {
+    @apply p-1;
+  }
+  
+  .slick-prev {
+    @apply -left-4;
+  }
+  
+  .slick-next {
+    @apply -right-4;
+  }
+}

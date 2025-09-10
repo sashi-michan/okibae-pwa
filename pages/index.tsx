@@ -425,9 +425,11 @@ export default function Home() {
   )
 }
 
-// スワイプ対応のカルーセル形式背景選択コンポーネント
+// 参考サイトベースの真のカルーセル実装
 function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange: (value: BgOption) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
   
   const backgrounds: Array<{ value: BgOption; label: string; image: string }> = [
     { value: 'white', label: '白い水彩紙', image: '/input_image/sample_white.jpeg' },
@@ -441,86 +443,118 @@ function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange
     if (index !== -1) setCurrentIndex(index)
   }, [current])
 
-  const handleSwipe = (direction: 'prev' | 'next') => {
-    let newIndex = currentIndex
-    if (direction === 'prev') {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : backgrounds.length - 1
-    } else {
-      newIndex = currentIndex < backgrounds.length - 1 ? currentIndex + 1 : 0
-    }
+  const handleSlideChange = (newIndex: number) => {
     setCurrentIndex(newIndex)
     onChange(backgrounds[newIndex].value)
+  }
+
+  const handlePrev = () => {
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : backgrounds.length - 1
+    handleSlideChange(newIndex)
+  }
+
+  const handleNext = () => {
+    const newIndex = currentIndex < backgrounds.length - 1 ? currentIndex + 1 : 0
+    handleSlideChange(newIndex)
+  }
+
+  // スワイプ処理
+  const minSwipeDistance = 50
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe) {
+      handleNext()
+    } else if (isRightSwipe) {
+      handlePrev()
+    }
   }
 
   const currentBg = backgrounds[currentIndex]
 
   return (
-    <div className="relative flex items-center justify-center">
-      {/* 左スワイプボタン */}
+    <div className="slick-container">
+      {/* メインカルーセルエリア */}
+      <div 
+        className="slick-carousel"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <div 
+          className="slick-track"
+          style={{
+            transform: `translateX(-${currentIndex * 33.333}%)`,
+            width: '300%'
+          }}
+        >
+          {backgrounds.map((bg, index) => (
+            <div 
+              key={bg.value}
+              className={`slick-slide ${index === currentIndex ? 'slick-center' : ''}`}
+              onClick={() => handleSlideChange(index)}
+            >
+              <div className="slick-slide-content">
+                <img 
+                  src={bg.image}
+                  alt={bg.label}
+                  className="slick-slide-image"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ナビゲーション矢印 */}
       <button
-        onClick={() => handleSwipe('prev')}
-        className="absolute left-0 z-10 p-2 rounded-full bg-white shadow-lg border hover:bg-gray-50 transition-colors"
+        onClick={handlePrev}
+        className="slick-arrow slick-prev"
         aria-label="前の背景"
       >
-        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      {/* メイン表示カード */}
-      <div className="mx-12">
-        <div className="group relative overflow-hidden rounded-2xl transition-all duration-300 border-2 border-brand-500 shadow-xl">
-          {/* プレビュー画像 */}
-          <div className="w-48 h-48 relative">
-            <img 
-              src={currentBg.image}
-              alt={`${currentBg.label}の背景`}
-              className="w-full h-full object-cover"
-            />
-            {/* オーバーレイ */}
-            <div className="absolute inset-0 bg-brand-500/10" />
-            
-            {/* 選択アイコン */}
-            <div className="absolute top-3 right-3 w-6 h-6 bg-brand-500 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-          
-          {/* ラベル */}
-          <div className="px-6 py-4 text-center bg-brand-50">
-            <h3 className="text-lg font-medium text-brand-600">{currentBg.label}</h3>
-          </div>
-        </div>
-      </div>
-
-      {/* 右スワイプボタン */}
       <button
-        onClick={() => handleSwipe('next')}
-        className="absolute right-0 z-10 p-2 rounded-full bg-white shadow-lg border hover:bg-gray-50 transition-colors"
+        onClick={handleNext}
+        className="slick-arrow slick-next"
         aria-label="次の背景"
       >
-        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>
 
-      {/* インジケーター */}
-      <div className="absolute bottom-[-40px] flex gap-2 justify-center">
+      {/* ドットインジケーター */}
+      <div className="slick-dots">
         {backgrounds.map((_, index) => (
           <button
             key={index}
-            onClick={() => {
-              setCurrentIndex(index)
-              onChange(backgrounds[index].value)
-            }}
-            className={clsx(
-              "w-2 h-2 rounded-full transition-colors",
-              index === currentIndex ? "bg-brand-500" : "bg-gray-300"
-            )}
+            onClick={() => handleSlideChange(index)}
+            className={`slick-dot ${index === currentIndex ? 'slick-active' : ''}`}
+            aria-label={`スライド ${index + 1}`}
           />
         ))}
+      </div>
+
+      {/* ラベル表示 */}
+      <div className="slick-label">
+        <h3 className="typography-label text-center">{currentBg.label}</h3>
       </div>
     </div>
   )

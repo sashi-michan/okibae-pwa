@@ -1,0 +1,80 @@
+{
+  "test_summary": {
+    "mask_size": [
+      400,
+      400
+    ],
+    "mask_pixels": 17741,
+    "contact_pixels": 505,
+    "test_angles": [
+      0,
+      45,
+      90,
+      135,
+      180,
+      225,
+      270,
+      315
+    ],
+    "max_distance": 80
+  },
+  "height_maps": {
+    "boundary_height": {
+      "max": 1.0,
+      "mean": 0.38590672612190247,
+      "non_zero_pixels": 17741
+    },
+    "contact_height": {
+      "max": 1.0,
+      "mean": 0.45182740688323975,
+      "non_zero_pixels": 159495
+    },
+    "final_height": {
+      "max": 0.6307284235954285,
+      "mean": 0.2980119585990906,
+      "non_zero_pixels": 17741
+    }
+  },
+  "shadow_results": {
+    "0": {
+      "max_intensity": 0.0,
+      "non_zero_pixels": 0,
+      "mean_intensity": 0
+    },
+    "45": {
+      "max_intensity": 0.0,
+      "non_zero_pixels": 0,
+      "mean_intensity": 0
+    },
+    "90": {
+      "max_intensity": 1.0,
+      "non_zero_pixels": 45,
+      "mean_intensity": 0.9833333492279053
+    },
+    "135": {
+      "max_intensity": 1.0,
+      "non_zero_pixels": 84,
+      "mean_intensity": 0.9784226417541504
+    },
+    "180": {
+      "max_intensity": 1.0,
+      "non_zero_pixels": 273,
+      "mean_intensity": 0.9981684684753418
+    },
+    "225": {
+      "max_intensity": 1.0,
+      "non_zero_pixels": 84,
+      "mean_intensity": 0.9784226417541504
+    },
+    "270": {
+      "max_intensity": 1.0,
+      "non_zero_pixels": 45,
+      "mean_intensity": 0.9833333492279053
+    },
+    "315": {
+      "max_intensity": 0.0,
+      "non_zero_pixels": 0,
+      "mean_intensity": 0
+    }
+  }
+}
