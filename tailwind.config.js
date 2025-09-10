@@ -3,7 +3,7 @@ module.exports = {
   content: ["./pages/**/*.{js,ts,jsx,tsx}","./components/**/*.{js,ts,jsx,tsx}"],
   theme: { extend: {
     colors: { 
-      brand: {50:"#fef7f7",100:"#fdeeee",200:"#fbdada",300:"#f6bdbd",400:"#ef9e9e",500:"#e27f7f",600:"#c55f5f",700:"#a14545",800:"#7e3535",900:"#582525"}, 
+      brand: {50:"#faf7f8",100:"#f5eef0",200:"#eddde1",300:"#dfc4ca",400:"#c2a2a8",500:"#C2A2A8",600:"#a8848c",700:"#8a6b73",800:"#6d535a",900:"#4d3c42"}, 
       cream:"#FAF9F6", 
       beige:"#F4EDE4"
     },

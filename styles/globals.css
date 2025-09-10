@@ -7,7 +7,11 @@
 
 /* 基本スタイル */
 html, body, #__next { height: 100%; }
-body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1; }
+body { 
+  @apply bg-gradient-to-br from-pink-50 via-cream to-orange-50 text-gray-700 font-cute; 
+  font-feature-settings: "palt" 1;
+  background-attachment: fixed;
+}
 
 /* タイポグラフィ - 可愛いフォント設定 */
 .typography-main-title { @apply text-xl md:text-2xl font-bold tracking-wide font-cute text-gray-800; }
@@ -20,17 +24,67 @@ body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1;
 .typography-nav-menu { @apply text-sm font-cute text-gray-600; }
 
 /* コンポーネント */
-.btn { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button transform hover:scale-[1.02] hover:shadow-lg; }
-.btn-primary { @apply bg-gradient-to-r from-brand-500 to-brand-600 text-white hover:from-brand-400 hover:to-brand-500 active:from-brand-600 active:to-brand-700; }
+.btn { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button hover:shadow-lg; }
+.btn-primary { 
+  background: #C792A3;
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(199, 146, 163, 0.25);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #B8899A;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transform: rotate(45deg);
+  transition: all 0.6s;
+  opacity: 0;
+}
+
+.btn-primary:hover::before {
+  opacity: 1;
+  transform: rotate(45deg) translate(50%, 50%);
+}
 .btn-ghost { @apply bg-gradient-to-b from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 border border-gray-200 hover:border-gray-300; }
-.card { @apply bg-gradient-to-br from-white via-white to-gray-50/30 rounded-3xl shadow-soft border border-gray-100/50 p-6 md:p-8 backdrop-blur-sm; }
+.card { 
+  @apply bg-gradient-to-br from-white/90 via-pink-50/40 to-orange-50/30 rounded-3xl shadow-premium border border-gray-100/60 p-6 md:p-8 backdrop-blur-md;
+  position: relative;
+  overflow: visible;
+}
+
 .badge { @apply inline-flex items-center gap-1 rounded-full bg-pink-50 text-pink-700 px-3 py-1 text-xs; }
 
 /* 共通UIパターン */
 .icon-badge { @apply inline-flex items-center justify-center text-white font-cute transition-all duration-300 transform hover:scale-110 shadow-sm; }
 .icon-badge-sm { @apply h-6 w-6 rounded-full text-xs font-medium; }
 .icon-badge-md { @apply h-8 w-8 rounded-xl; }
-.stepper-badge { @apply flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium font-cute text-white shadow-sm transition-all duration-200; }
+.stepper-badge { 
+  @apply flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium font-cute text-white shadow-sm transition-all duration-300;
+  background: linear-gradient(135deg, #ec4899, #f97316);
+  position: relative;
+  overflow: hidden;
+}
+
+.stepper-badge::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+  border-radius: 50%;
+}
 .placeholder-area { @apply aspect-square w-full border-2 border-dashed border-gray-200/60 rounded-2xl grid place-content-center transition-all duration-300 hover:border-brand-200/60 hover:bg-brand-50/20 hover:shadow-md; }
 .loading-spinner { @apply w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin drop-shadow-sm; }
 .status-success { @apply text-emerald-500 font-medium; }
@@ -42,6 +96,9 @@ body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1;
 .animate-slide-up { animation: slideUp 0.4s ease-out; }
 .animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.25, 0.46, 0.25, 1); }
 .animate-slide-in-left { animation: slideInLeft 0.35s cubic-bezier(0.25, 0.46, 0.25, 1); }
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-sparkle { animation: sparkle 2s ease-in-out infinite; }
+.animate-pulse-soft { animation: pulseSoft 4s ease-in-out infinite; }
 
 @keyframes gentleBounce {
   0%, 100% { transform: scale(1); }
@@ -81,9 +138,84 @@ body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1;
 .animate-slide-out-left { animation: slideOutLeft 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards; }
 .animate-slide-out-right { animation: slideOutRight 0.35s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards; }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes sparkle {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 0.5; 
+    transform: scale(1.1); 
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.02); 
+  }
+}
+
 /* 高級感のある影 */
 .shadow-premium { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04); }
 .shadow-premium-hover { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 6px 20px rgba(0, 0, 0, 0.06); }
+
+/* 可愛い装飾要素 */
+.cute-decoration {
+  position: relative;
+}
+
+.cute-decoration::before {
+  content: '✨';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 16px;
+  animation: sparkle 2s ease-in-out infinite;
+  z-index: 1;
+}
+
+.main-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.main-container::before {
+  content: '';
+  position: fixed;
+  top: 20%;
+  left: 10%;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(255, 182, 193, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.main-container::after {
+  content: '';
+  position: fixed;
+  top: 60%;
+  right: 15%;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 6s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
 
 /* インタラクティブ要素 */
 .interactive-card { 
@@ -139,24 +271,32 @@ body { @apply bg-cream text-gray-700 font-cute; font-feature-settings: "palt" 1;
 }
 
 /* ナビゲーション矢印 - ミニマルデザイン */
-.slick-arrow {
-  @apply absolute z-20 p-2 transition-all duration-200 text-gray-400 hover:text-gray-600 hover:scale-110;
-  background: none;
-  border: none;
+.slick-container .slick-arrow {
+  position: absolute !important;
+  z-index: 20 !important;
+  padding: 0.5rem !important;
+  background: none !important;
+  border: none !important;
   top: 42% !important;
-  transform: translateY(-50%);
+  transform: translateY(-50%) !important;
+  color: rgb(156 163 175) !important;
+  transition: all 0.2s !important;
 }
 
-.slick-arrow:hover {
+.slick-container .slick-arrow:hover {
+  color: rgb(75 85 99) !important;
+  transform: translateY(-50%) scale(1.1) !important;
   top: 42% !important;
 }
 
-.slick-prev {
-  @apply -left-6;
+.slick-container .slick-prev {
+  left: -1.5rem !important;
+  top: 42% !important;
 }
 
-.slick-next {
-  @apply -right-6;
+.slick-container .slick-next {
+  right: -1.5rem !important;
+  top: 42% !important;
 }
 
 /* ドットインジケーター */

@@ -310,13 +310,13 @@ export default function Home() {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="typography-main-title">OKIBAE</h1>
-        <p className="typography-subtitle mt-1">おしゃれな置き画を、かんたんに</p>
+    <div className="main-container">
+      <div className="mb-6 relative">
+        <h1 className="typography-main-title animate-fade-in">OKIBAE</h1>
+        <p className="typography-subtitle mt-1 animate-slide-up">おしゃれな置き画を、かんたんに</p>
       </div>
       
-      <div className="grid lg:grid-cols-[260px_1fr] gap-6">
+      <div className="grid lg:grid-cols-[260px_1fr] gap-6 px-8 py-8">
         <div className="lg:block hidden mt-6">
           <Stepper currentStep={1} />
         </div>
@@ -375,9 +375,9 @@ export default function Home() {
           
           <StepCard stepNumber={3} title="天気を選ぶ">
             <div className="mb-4 flex items-center gap-2">
-              <WeatherBadge current={weather} value="sunny" label="晴れ" onClick={handleWeatherPreset} />
-              <WeatherBadge current={weather} value="cloudy" label="くもり" onClick={handleWeatherPreset} />
-              <WeatherBadge current={weather} value="rainy" label="雨" onClick={handleWeatherPreset} />
+              <WeatherBadge current={weather} value="sunny" label="晴れ" color="sunny" onClick={handleWeatherPreset} />
+              <WeatherBadge current={weather} value="cloudy" label="くもり" color="cloudy" onClick={handleWeatherPreset} />
+              <WeatherBadge current={weather} value="rainy" label="雨" color="rainy" onClick={handleWeatherPreset} />
             </div>
           </StepCard>
           
@@ -560,14 +560,76 @@ function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange
   )
 }
 
-function WeatherBadge({ current, value, label, onClick }:{ current: WeatherOption | null, value: WeatherOption, label: string, onClick: (v: WeatherOption)=>void | Promise<void> }) {
+function WeatherBadge({ current, value, label, color, onClick }:{ 
+  current: WeatherOption | null, 
+  value: WeatherOption, 
+  label: string, 
+  color: WeatherOption,
+  onClick: (v: WeatherOption)=>void | Promise<void> 
+}) {
   const active = current === value
+  
+  const colorStyles = {
+    sunny: active ? "text-amber-800" : "text-amber-700 hover:opacity-80",
+    cloudy: active ? "text-purple-800" : "text-purple-700 hover:opacity-80", 
+    rainy: active ? "text-blue-800" : "text-blue-700 hover:opacity-80"
+  }
+  
+  const backgroundStyles = {
+    sunny: active ? { backgroundColor: '#EDBC9D' } : { backgroundColor: '#EDBC9D20', borderColor: '#EDBC9D60' },
+    cloudy: active ? { backgroundColor: '#D6C5D5' } : { backgroundColor: '#D6C5D520', borderColor: '#D6C5D560' },
+    rainy: active ? { backgroundColor: '#ACC3D6' } : { backgroundColor: '#ACC3D620', borderColor: '#ACC3D660' }
+  }
+  
+  const renderIcon = () => {
+    const iconClass = "w-4 h-4"
+    switch (value) {
+      case 'sunny':
+        return (
+          <svg className={iconClass} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeMiterlimit="10">
+            <line x1="24" y1="2" x2="24" y2="5"/>
+            <line x1="24" y1="43" x2="24" y2="46"/>
+            <line x1="46" y1="24" x2="43" y2="24"/>
+            <line x1="5" y1="24" x2="2" y2="24"/>
+            <line x1="39.56" y1="39.56" x2="37.44" y2="37.44"/>
+            <line x1="10.56" y1="10.56" x2="8.44" y2="8.44"/>
+            <line x1="8.44" y1="39.56" x2="10.56" y2="37.44"/>
+            <line x1="37.44" y1="10.56" x2="39.56" y2="8.44"/>
+            <circle cx="24" cy="24" r="11"/>
+          </svg>
+        )
+      case 'cloudy':
+        return (
+          <svg className={iconClass} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeMiterlimit="10">
+            <path d="M36,18a10.19,10.19,0,0,0-2.08.22,11.49,11.49,0,1,0-22.61,3.9A8,8,0,1,0,10,38H36a10,10,0,0,0,0-20Z"/>
+          </svg>
+        )
+      case 'rainy':
+        return (
+          <svg className={iconClass} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M40,33A16,16,0,0,0,8,33H34.67"/>
+            <line x1="24" y1="33" x2="24" y2="42"/>
+            <line x1="24" y1="13" x2="24" y2="17"/>
+            <line x1="25.09" y1="2" x2="22.91" y2="8"/>
+            <line x1="15.09" y1="2" x2="12.91" y2="8"/>
+            <line x1="35.09" y1="2" x2="32.91" y2="8"/>
+            <path d="M32,42a4,4,0,0,1-8,0"/>
+          </svg>
+        )
+    }
+  }
+
   return (
     <button
       onClick={() => onClick(value)}
-      className={clsx("px-3 py-1 rounded-full text-sm border transition", active ? "bg-brand-500 text-white border-brand-500" : "bg-white hover:bg-gray-50 border-gray-200")}
+      className={clsx(
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button hover:shadow-lg border",
+        colorStyles[color]
+      )}
+      style={backgroundStyles[color]}
     >
-      {label}
+      {renderIcon()}
+      <span>{label}</span>
     </button>
   )
 }
