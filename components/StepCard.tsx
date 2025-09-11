@@ -11,7 +11,7 @@ export default function StepCard({ stepNumber, title, children }: StepCardProps)
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white text-xs font-medium">
           {stepNumber}
         </span>
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="typography-step-title">{title}</h2>
       </div>
       {children}
     </div>

@@ -63,6 +63,10 @@ export default function Home() {
             const backgroundColor = getBackgroundColor(bg)
             // Convert imgUrl (blob) to base64 for nano banana
             const img = await loadImage(imgUrl)
+            if (!img) {
+              setAppState({ phase: 'IDLE', status: 'error', error: '画像の読み込みに失敗しました' })
+              return
+            }
             const base64 = await toBase64Resized(img, 1536)
             const enhancedUrl = await enhanceWithAIShadows(base64, backgroundColor, weather)
             
@@ -312,8 +316,15 @@ export default function Home() {
   return (
     <div className="main-container">
       <div className="mb-6 relative">
-        <h1 className="typography-main-title animate-fade-in">OKIBAE</h1>
-        <p className="typography-subtitle mt-1 animate-slide-up">おしゃれな置き画を、かんたんに</p>
+        <div className="flex items-center justify-center gap-3 animate-fade-in">
+          <img 
+            src="/okibae-icon.svg" 
+            alt="OKIBAE" 
+            className="h-10 w-10" 
+          />
+          <h1 className="typography-main-title">OKIBAE</h1>
+        </div>
+        <p className="typography-subtitle mt-1 animate-slide-up text-center">おしゃれな置き画を、かんたんに</p>
       </div>
       
       <div className="grid lg:grid-cols-[260px_1fr] gap-6 px-8 py-8">

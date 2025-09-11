@@ -14,11 +14,11 @@ body {
 }
 
 /* タイポグラフィ - 可愛いフォント設定 */
-.typography-main-title { @apply text-xl md:text-2xl font-bold tracking-wide font-cute text-gray-800; }
+.typography-main-title { @apply text-xl md:text-2xl font-bold tracking-wide font-cute; color: #666666; }
 .typography-subtitle { @apply text-sm md:text-base font-medium font-cute text-gray-500; }
-.typography-step-title { @apply text-lg font-semibold font-cute text-gray-700; }
+.typography-step-title { @apply text-lg font-semibold font-cute; color: #666666; }
 .typography-body { @apply text-sm text-gray-500 font-cute; }
-.typography-label { @apply text-lg font-medium font-cute text-gray-700; }
+.typography-label { @apply text-lg font-medium font-cute; color: #666666; }
 .typography-button { @apply font-cute text-gray-600; }
 .typography-nav-logo { @apply font-bold font-cute text-gray-800; }
 .typography-nav-menu { @apply text-sm font-cute text-gray-600; }
