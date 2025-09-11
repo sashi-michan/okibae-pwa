@@ -19,7 +19,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           <Component {...pageProps} />
         </main>
         <footer className="text-center text-xs text-gray-500 py-6">
-          <span>© {new Date().getFullYear()} OKIBAE Starter</span>
+          <span>© {new Date().getFullYear()} OKIBAE</span>
         </footer>
       </div>
     </>

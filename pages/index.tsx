@@ -13,15 +13,45 @@ type AppState = {
 }
 
 export default function Home() {
+  // デバッグモード（開発時は制限なし）
+  const DEBUG_MODE = process.env.NODE_ENV === 'development'
+  
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
   const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
   const [weather, setWeather] = useState<WeatherOption>('sunny') // デフォルト天気を晴れに設定
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
+  const [dailyUsage, setDailyUsage] = useState({ count: 0, date: '' })
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // 日次使用制限の管理
+  useEffect(() => {
+    const initDailyUsage = () => {
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+      const savedDate = localStorage.getItem('okibae-date')
+      const savedCount = localStorage.getItem('okibae-count')
+      
+      console.log('Main page init:', { today, savedDate, savedCount })
+      
+      if (savedDate === today && savedCount) {
+        // 今日のデータがある場合
+        const count = parseInt(savedCount, 10)
+        console.log('Loading existing count:', count)
+        setDailyUsage({ count, date: today })
+      } else {
+        // 初回または日付が変わった場合はリセット
+        console.log('Resetting count to 0')
+        localStorage.setItem('okibae-date', today)
+        localStorage.setItem('okibae-count', '0')
+        setDailyUsage({ count: 0, date: today })
+      }
+    }
+    
+    initDailyUsage()
+  }, [])
 
   useEffect(() => {
     if (!file) return
@@ -71,6 +101,15 @@ export default function Home() {
             
             // nano banana結果をstateに保存してFINAL_READYで描画
             setAppState({ phase: 'FINAL_READY', finalImageUrl: enhancedUrl })
+            
+            // 使用回数をカウントアップ
+            const newCount = dailyUsage.count + 1
+            setDailyUsage(prev => ({ ...prev, count: newCount }))
+            localStorage.setItem('okibae-count', newCount.toString())
+            
+            // ナビバー更新のためのイベント発火
+            console.log('Dispatching okibae-usage-update event')
+            window.dispatchEvent(new Event('okibae-usage-update'))
           }
           break
           
@@ -225,6 +264,13 @@ export default function Home() {
 
   const handleGenerateFinal = async () => {
     console.log('handleGenerateFinal called', { phase: appState.phase, bg, weather, imgUrl: !!imgUrl })
+    
+    // 1日5枚制限チェック（デバッグモードは制限なし）
+    if (!DEBUG_MODE && dailyUsage.count >= 5) {
+      alert('申し訳ございません。1日の生成上限（5枚）に達しました。明日また挑戦してみてください！')
+      return
+    }
+    
     if (!bg || !weather || !imgUrl) {
       console.log('Missing bg, weather, or imgUrl, returning')
       return
@@ -385,9 +431,10 @@ export default function Home() {
               <button 
                 className="btn btn-primary disabled:opacity-50 mb-4" 
                 onClick={handleGenerateFinal} 
-                disabled={!imgUrl || appState.phase === 'FINAL_RENDERING'}
+                disabled={!imgUrl || appState.phase === 'FINAL_RENDERING' || (!DEBUG_MODE && dailyUsage.count >= 5)}
               >
-                {appState.phase === 'FINAL_RENDERING' ? '生成中...' : '生成！'}
+                {(!DEBUG_MODE && dailyUsage.count >= 5) ? '本日の上限に達しました' : 
+                 appState.phase === 'FINAL_RENDERING' ? '生成中...' : '生成！'}
               </button>
             ) : (
               <div className="text-sm text-green-600 mb-4">✓ 生成完了</div>
