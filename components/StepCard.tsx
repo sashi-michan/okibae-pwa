@@ -2,11 +2,12 @@ interface StepCardProps {
   stepNumber: number
   title: string
   children: React.ReactNode
+  className?: string
 }
 
-export default function StepCard({ stepNumber, title, children }: StepCardProps) {
+export default function StepCard({ stepNumber, title, children, className }: StepCardProps) {
   return (
-    <div className="card">
+    <div className={`card ${className || ''}`}>
       <div className="flex items-center gap-2 mb-4">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white text-xs font-medium">
           {stepNumber}

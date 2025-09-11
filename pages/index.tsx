@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import Stepper from '../components/Stepper'
 import StepCard from '../components/StepCard'
 
 type BgOption = 'white' | 'linen' | 'concrete'
@@ -327,20 +326,10 @@ export default function Home() {
         <p className="typography-subtitle mt-1 animate-slide-up text-center">おしゃれな置き画を、かんたんに</p>
       </div>
       
-      <div className="grid lg:grid-cols-[260px_1fr] gap-6 px-8 py-8">
-        <div className="lg:block hidden mt-6">
-          <Stepper currentStep={1} />
-        </div>
-        
+      <div className="max-w-2xl mx-auto px-8 py-8">
         <div className="space-y-6">
-          <div className="lg:hidden">
-            <Stepper currentStep={1} />
-          </div>
           
-          <StepCard stepNumber={1} title="画像を選ぶ">
-            <p className="mb-4 text-sm text-gray-600">
-              まずは画像を1枚えらんでね。
-            </p>
+          <StepCard stepNumber={1} title="画像を選ぶ" className="animate-slide-up">
             <label className="btn btn-ghost cursor-pointer">
               <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
               画像を選ぶ
@@ -377,14 +366,13 @@ export default function Home() {
             )}
           </StepCard>
           
-          <StepCard stepNumber={2} title="背景を選ぶ">
+          <StepCard stepNumber={2} title="背景を選ぶ" className="animate-slide-up">
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-6">お好みの背景を選んでください</p>
               <BackgroundCarousel current={bg} onChange={handleBgPreset} />
             </div>
           </StepCard>
           
-          <StepCard stepNumber={3} title="天気を選ぶ">
+          <StepCard stepNumber={3} title="天気を選ぶ" className="animate-slide-up">
             <div className="mb-4 flex items-center gap-2">
               <WeatherBadge current={weather} value="sunny" label="晴れ" color="sunny" onClick={handleWeatherPreset} />
               <WeatherBadge current={weather} value="cloudy" label="くもり" color="cloudy" onClick={handleWeatherPreset} />
@@ -392,7 +380,7 @@ export default function Home() {
             </div>
           </StepCard>
           
-          <StepCard stepNumber={4} title="保存">
+          <StepCard stepNumber={4} title="保存" className="animate-slide-up">
             {appState.phase !== 'FINAL_READY' ? (
               <button 
                 className="btn btn-primary disabled:opacity-50 mb-4" 
@@ -443,7 +431,7 @@ function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
   
   const backgrounds: Array<{ value: BgOption; label: string; image: string }> = [
-    { value: 'white', label: '白い水彩紙', image: '/input_image/sample_white.jpeg' },
+    { value: 'white', label: '白画用紙', image: '/input_image/sample_white.jpeg' },
     { value: 'linen', label: 'リネン布', image: '/input_image/sample_linen.jpeg' },
     { value: 'concrete', label: 'コンクリート', image: '/input_image/sample_concrete.jpeg' }
   ]
