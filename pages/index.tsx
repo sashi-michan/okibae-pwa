@@ -20,6 +20,7 @@ export default function Home() {
   const [imgUrl, setImgUrl] = useState<string>('')
   const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
   const [weather, setWeather] = useState<WeatherOption>('sunny') // デフォルト天気を晴れに設定
+  const [modalImage, setModalImage] = useState<string | null>(null)
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
   const [dailyUsage, setDailyUsage] = useState({ count: 0, date: '' })
@@ -282,7 +283,7 @@ export default function Home() {
           
           <StepCard stepNumber={2} title="背景を選ぶ" className="animate-slide-up">
             <div className="mb-4">
-              <BackgroundCarousel current={bg} onChange={handleBgPreset} />
+              <BackgroundCarousel current={bg} onChange={handleBgPreset} setModalImage={setModalImage} />
             </div>
           </StepCard>
           
@@ -335,12 +336,37 @@ export default function Home() {
           </StepCard>
         </div>
       </div>
+      
+      {/* モーダル表示 - 全画面表示のため最上位レベルに配置 */}
+      {modalImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={() => setModalImage(null)}
+        >
+          <div 
+            className="relative max-w-2xl max-h-[80vh] m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={modalImage}
+              alt="背景プレビュー"
+              className="w-full h-full object-contain rounded-lg max-w-full max-h-full"
+            />
+            <button
+              onClick={() => setModalImage(null)}
+              className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-opacity-75 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // 参考サイトベースの真のカルーセル実装
-function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange: (value: BgOption) => void }) {
+function BackgroundCarousel({ current, onChange, setModalImage }: { current: BgOption, onChange: (value: BgOption) => void, setModalImage: (image: string | null) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
@@ -419,13 +445,21 @@ function BackgroundCarousel({ current, onChange }: { current: BgOption, onChange
             <div 
               key={bg.value}
               className={`slick-slide ${index === currentIndex ? 'slick-center' : ''}`}
-              onClick={() => handleSlideChange(index)}
             >
               <div className="slick-slide-content">
                 <img 
                   src={bg.image}
                   alt={bg.label}
                   className="slick-slide-image"
+                  onClick={() => {
+                    if (index === currentIndex) {
+                      // 現在選択中の画像をクリックした場合はモーダル表示
+                      setModalImage(bg.image)
+                    } else {
+                      // 他の画像をクリックした場合は選択変更
+                      handleSlideChange(index)
+                    }
+                  }}
                 />
               </div>
             </div>
