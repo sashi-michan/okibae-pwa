@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { GoogleGenAI } from '@google/genai'
+import { VertexAI } from '@google-cloud/vertexai'
 import formidable from 'formidable'
 import fs from 'fs'
 import path from 'path'
@@ -27,7 +27,16 @@ const parseForm = (req: NextApiRequest): Promise<{ fields: formidable.Fields; fi
   })
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+// Vertex AI クライアントの初期化
+const vertexAI = new VertexAI({
+  project: process.env.GOOGLE_CLOUD_PROJECT!,
+  location: process.env.GOOGLE_CLOUD_LOCATION || 'global',
+  apiEndpoint: 'aiplatform.googleapis.com',  // globalエンドポイントを明示
+});
+
+const generativeModel = vertexAI.preview.getGenerativeModel({
+  model: 'gemini-2.5-flash-image-preview',
+});
 
 // 参考画像のパスマップ
 const REFERENCE_IMAGES: Record<StyleKey, string> = {
@@ -136,19 +145,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const prompt = buildPrompt(style as StyleKey, { weather: weather as WeatherKey })
 
 
-    // Gemini API呼び出し（2つの画像を送信）
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image-preview',
-      contents: [
-        prompt,
-        { inlineData: { mimeType: inputMime, data: inputBase64 } },      // 1ST IMAGE: 商品画像
-        { inlineData: { mimeType: referenceImage.mime, data: referenceImage.base64 } }, // 2ND IMAGE: 参考画像
-      ],
-    })
+    // Vertex AI Gemini API呼び出し（2つの画像を送信）
+    let result
+    try {
+      console.log('Calling Vertex AI with model:', 'gemini-2.5-flash-image-preview')
+      console.log('Project:', process.env.GOOGLE_CLOUD_PROJECT)
+      console.log('Location:', process.env.GOOGLE_CLOUD_LOCATION)
+      
+      // Base64データの確認
+      console.log('Input image MIME:', inputMime)
+      console.log('Input base64 length:', inputBase64.length)
+      console.log('Input base64 starts with:', inputBase64.substring(0, 20))
+      console.log('Reference image MIME:', referenceImage.mime)
+      console.log('Reference base64 length:', referenceImage.base64.length)
+      console.log('Reference base64 starts with:', referenceImage.base64.substring(0, 20))
+      
+      result = await generativeModel.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: inputMime, data: inputBase64 } },      // 1ST IMAGE: 商品画像
+            { inlineData: { mimeType: referenceImage.mime, data: referenceImage.base64 } }, // 2ND IMAGE: 参考画像
+          ]
+        }],
+        generationConfig: {
+          maxOutputTokens: 1024,
+          temperature: 0.1,
+          topP: 0.8,
+          // 画像とテキストの両方を出力として指定
+          responseModalities: ['TEXT', 'IMAGE']
+        }
+      })
+    } catch (e: any) {
+      console.error('Vertex AI Error Details:')
+      console.error('Status:', e?.cause?.status)
+      console.error('Message:', e?.message)
+      if (e?.cause?.response?.text) {
+        console.error('Response body:', await e.cause.response.text())
+      }
+      throw e
+    }
 
 
-    // 画像レスポンス抽出
-    const parts = result.candidates?.[0]?.content?.parts ?? []
+    // 画像レスポンス抽出（Vertex AI形式）
+    const parts = result.response?.candidates?.[0]?.content?.parts ?? []
     const imagePart = parts.find((p: any) => p.inlineData && p.inlineData.mimeType?.startsWith('image/'))
     
     if (!imagePart) {

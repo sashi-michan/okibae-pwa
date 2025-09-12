@@ -11,6 +11,7 @@ out/
 .env.*
 !.env.example
 secrets/
+credentials/
 
 # public originals
 public/originals/
