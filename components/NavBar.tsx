@@ -11,16 +11,12 @@ export default function NavBar() {
       const savedDate = localStorage.getItem('okibae-date')
       const savedCount = localStorage.getItem('okibae-count')
       
-      console.log('NavBar init:', { today, savedDate, savedCount })
-      
       if (savedDate === today && savedCount) {
         // 今日のデータがある場合
         const count = parseInt(savedCount, 10)
-        console.log('NavBar loading existing count:', count)
         setDailyUsage({ count, date: today })
       } else {
         // 初回または日付が変わった場合はリセット
-        console.log('NavBar resetting count to 0')
         localStorage.setItem('okibae-date', today)
         localStorage.setItem('okibae-count', '0')
         setDailyUsage({ count: 0, date: today })
@@ -31,7 +27,6 @@ export default function NavBar() {
 
     // localStorageの変更を監視
     const handleStorageChange = () => {
-      console.log('Storage change detected, updating usage...')
       initDailyUsage()
     }
 

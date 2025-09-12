@@ -34,16 +34,12 @@ export default function Home() {
       const savedDate = localStorage.getItem('okibae-date')
       const savedCount = localStorage.getItem('okibae-count')
       
-      console.log('Main page init:', { today, savedDate, savedCount })
-      
       if (savedDate === today && savedCount) {
         // 今日のデータがある場合
         const count = parseInt(savedCount, 10)
-        console.log('Loading existing count:', count)
         setDailyUsage({ count, date: today })
       } else {
         // 初回または日付が変わった場合はリセット
-        console.log('Resetting count to 0')
         localStorage.setItem('okibae-date', today)
         localStorage.setItem('okibae-count', '0')
         setDailyUsage({ count: 0, date: today })
@@ -68,7 +64,6 @@ export default function Home() {
   // 司令塔useEffect - 背景除去のみ自動実行
   useEffect(() => {
     const handleStateTransition = async () => {
-      console.log('State transition:', { phase: appState.phase, imgUrl: !!imgUrl })
       
       switch (appState.phase) {
         case 'IDLE':
@@ -76,19 +71,10 @@ export default function Home() {
           break
           
         case 'FINAL_RENDERING':
-          // AI影生成 + drawComposite → FINAL_READY
-          console.log('FINAL_RENDERING condition check:', {
-            imgUrl: !!imgUrl,
-            bg: !!bg,
-            canvasRef: !!canvasRef.current,
-            noStatus: !appState.status,
-            currentStatus: appState.status
-          })
-          
+          // AI画像生成 → FINAL_READY
           if (imgUrl && bg && !appState.status) {
-            console.log('Starting final rendering with AI shadows')
             setAppState({ phase: 'FINAL_RENDERING', status: 'loading' })
-            // TODO: AI影生成実装予定（nano banana）
+            // AI画像生成（nano banana）
             const backgroundColor = getBackgroundColor(bg)
             // Convert imgUrl (blob) to base64 for nano banana
             const img = await loadImage(imgUrl)
@@ -97,7 +83,7 @@ export default function Home() {
               return
             }
             const base64 = await toBase64Resized(img, 1536)
-            const enhancedUrl = await enhanceWithAIShadows(base64, backgroundColor, weather)
+            const enhancedUrl = await generateStyledImage(base64, backgroundColor, weather)
             
             // nano banana結果をstateに保存してFINAL_READYで描画
             setAppState({ phase: 'FINAL_READY', finalImageUrl: enhancedUrl })
@@ -108,7 +94,6 @@ export default function Home() {
             localStorage.setItem('okibae-count', newCount.toString())
             
             // ナビバー更新のためのイベント発火
-            console.log('Dispatching okibae-usage-update event')
             window.dispatchEvent(new Event('okibae-usage-update'))
           }
           break
@@ -116,10 +101,6 @@ export default function Home() {
         case 'FINAL_READY':
           // nano banana結果をキャンバスに描画
           if (canvasRef.current && appState.finalImageUrl && !appState.status) {
-            console.log('Drawing final image to canvas', { 
-              finalImageUrl: appState.finalImageUrl.substring(0, 100) + '...',
-              isDataUrl: appState.finalImageUrl.startsWith('data:')
-            })
             const canvas = canvasRef.current
             const ctx = canvas.getContext('2d')!
             
@@ -153,11 +134,6 @@ export default function Home() {
               }
               
               ctx.drawImage(img, drawX, drawY, drawW, drawH)
-              console.log('Nano banana result drawn with aspect ratio preserved', { 
-                original: { w: img.naturalWidth, h: img.naturalHeight },
-                canvas: { w: outW, h: outH },
-                draw: { x: drawX, y: drawY, w: drawW, h: drawH }
-              })
             }
           }
           break
@@ -196,42 +172,6 @@ export default function Home() {
     }
   }
 
-  const enhanceWithShadow = async (cutoutBase64: string, backgroundColor: string, updateState: boolean = false) => {
-    console.log('enhanceWithShadow called', { backgroundColor, updateState, cutoutLength: cutoutBase64.length })
-    try {
-      const resp = await fetch('/api/enhance-shadow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          cutoutImageBase64: cutoutBase64,
-          backgroundColor 
-        })
-      })
-      
-      console.log('enhance-shadow response status:', resp.status)
-      
-      if (!resp.ok) {
-        const errorText = await resp.text()
-        console.error('enhance-shadow HTTP error:', resp.status, errorText)
-        return cutoutBase64
-      }
-      
-      const data = await resp.json()
-      console.log('enhance-shadow response:', { ok: data.ok, hasImage: !!data.enhancedImageBase64 })
-      
-      if (!data.ok) {
-        console.error('Shadow enhancement failed:', data.error)
-        return cutoutBase64 // フォールバック：元の画像を返す
-      }
-      
-      // 状態更新フラグが有効な場合の処理（nano banana使用のため不要）
-      
-      return data.enhancedImageBase64
-    } catch (e: any) {
-      console.error('Shadow enhancement error:', e.message, e)
-      return cutoutBase64 // フォールバック：元の画像を返す
-    }
-  }
 
   const handleBgPreset = async (next: BgOption) => {
     // 最終画像生成済みの場合は確認ダイアログを表示
@@ -263,8 +203,6 @@ export default function Home() {
 
 
   const handleGenerateFinal = async () => {
-    console.log('handleGenerateFinal called', { phase: appState.phase, bg, weather, imgUrl: !!imgUrl })
-    
     // 1日5枚制限チェック（デバッグモードは制限なし）
     if (!DEBUG_MODE && dailyUsage.count >= 5) {
       alert('申し訳ございません。1日の生成上限（5枚）に達しました。明日また挑戦してみてください！')
@@ -272,7 +210,6 @@ export default function Home() {
     }
     
     if (!bg || !weather || !imgUrl) {
-      console.log('Missing bg, weather, or imgUrl, returning')
       return
     }
     
@@ -288,75 +225,6 @@ export default function Home() {
     a.href = url; a.download = 'okibae.png'; a.click()
   }
 
-  const drawComposite = async ({ bg, customCutoutUrl }:{ bg:BgOption | null; customCutoutUrl?: string }) => {
-    console.log('drawComposite called', { bg, hasCanvas: !!canvasRef.current })
-    if (!canvasRef.current || !bg) {
-      console.log('Early return from drawComposite')
-      return
-    }
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')!
-
-    const outW = 1200, outH = 1200
-    canvas.width = outW; canvas.height = outH
-    console.log('Canvas setup complete', { outW, outH })
-
-    drawBackground(ctx, outW, outH, bg)
-    console.log('Background drawn')
-
-    const src = customCutoutUrl || imgUrl
-    console.log('Image source determined', { src: src ? 'data:...' : 'null', imgUrl: imgUrl ? 'blob:...' : 'null' })
-    if (!src) {
-      console.log('No src, returning')
-      return
-    }
-    const img = await loadImage(src)
-    if (!img) {
-      console.log('Failed to load image')
-      return
-    }
-    console.log('Image loaded successfully', { naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight })
-
-    // 配置サイズ（縦横どちらにも収まるようにフィット）
-    const pad = Math.round(outW * 0.06)
-    const maxW = outW - pad * 2
-    const maxH = outH - pad * 2
-
-    // 画像の自然サイズ
-    const iw = img.naturalWidth
-    const ih = img.naturalHeight
-
-    // 縮小率は「入る方」に合わせる
-    const scale = Math.min(maxW / iw, maxH / ih)
-
-    const drawW = Math.round(iw * scale)
-    const drawH = Math.round(ih * scale)
-    const x = Math.round((outW - drawW) / 2)  // 中央寄せ
-    const y = Math.round((outH - drawH) / 2)
-
-    if (customCutoutUrl) {
-      console.log('Drawing with cutout image (OpenCV shadows)')
-      // OpenCV影統一なので自前影は削除済み
-      ctx.filter = 'brightness(1.06) contrast(1.08)'
-      ctx.drawImage(img, x, y, drawW, drawH)
-      ctx.filter = 'none'
-      const [r,g,b] = estimateBgAverage(ctx, outW, outH)
-      ctx.save()
-      ctx.globalCompositeOperation = 'soft-light'
-      ctx.fillStyle = `rgba(${r},${g},${b},0.10)`; ctx.fillRect(0,0,outW,outH)
-      ctx.globalCompositeOperation = 'multiply'
-      ctx.fillStyle = `rgba(${r},${g},${b},0.05)`; ctx.fillRect(0,0,outW,outH)
-      ctx.restore()
-      console.log('Cutout drawing complete')
-    } else {
-      console.log('Drawing without cutout')
-      ctx.filter = 'brightness(1.04) contrast(1.06)'
-      ctx.drawImage(img, x, y, drawW, drawH)
-      ctx.filter = 'none'
-      console.log('Normal drawing complete')
-    }
-    console.log('drawComposite function completed')
-  }
 
   return (
     <div className="main-container">
@@ -702,38 +570,6 @@ function drawBackground(ctx: CanvasRenderingContext2D, w:number, h:number, bg: B
   }
 }
 
-function drawContactShadow(
-  ctx: CanvasRenderingContext2D, img: HTMLImageElement,
-  x:number, y:number, w:number, h:number, strength:number
-){
-  ctx.save()
-  ctx.globalCompositeOperation = 'multiply'
-  ctx.globalAlpha = Math.min(0.45, Math.max(0, strength))
-  const off = document.createElement('canvas')
-  off.width = w; off.height = h
-  const o = off.getContext('2d')!
-  o.drawImage(img, 0,0,w,h)
-  const id = o.getImageData(0,0,w,h)
-  for (let i=0;i<id.data.length;i+=4){ id.data[i]=0; id.data[i+1]=0; id.data[i+2]=0 }
-  o.putImageData(id,0,0)
-  o.filter = `blur(${Math.round(w*0.04)}px)`
-  const sx = 1.02, sy = 0.88
-  const dx = x + Math.round(w*0.02)
-  const dy = y + Math.round(h*0.06)
-  ctx.drawImage(off, 0,0,w,h, dx, dy, Math.round(w*sx), Math.round(h*sy))
-  ctx.restore()
-}
-
-function estimateBgAverage(ctx: CanvasRenderingContext2D, w:number, h:number): [number,number,number] {
-  const tmp = document.createElement('canvas')
-  tmp.width = 64; tmp.height = 64
-  const t = tmp.getContext('2d')!
-  t.drawImage(ctx.canvas, 0,0,w,h, 0,0,64,64)
-  const data = t.getImageData(0,0,64,64).data
-  let r=0,g=0,b=0,c=0
-  for (let i=0;i<data.length;i+=4) { r+=data[i]; g+=data[i+1]; b+=data[i+2]; c++ }
-  return [Math.round(r/c), Math.round(g/c), Math.round(b/c)]
-}
 
 function loadImage(url: string): Promise<HTMLImageElement | null> {
   return new Promise((res) => {
@@ -747,12 +583,6 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
 }
 
 async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
-  console.log('toBase64Resized called:', {
-    src: imgEl.src.substring(0, 50) + '...',
-    naturalWidth: imgEl.naturalWidth,
-    naturalHeight: imgEl.naturalHeight,
-    complete: imgEl.complete
-  })
 
   const { naturalWidth:w, naturalHeight:h } = imgEl
   const scale = w>h ? maxSide/w : maxSide/h
@@ -768,7 +598,6 @@ async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
       const blob = await response.blob()
       const mimeType = blob.type
       
-      console.log('Detected MIME type from blob:', mimeType)
       
       let result
       if (mimeType === 'image/jpeg') {
@@ -777,107 +606,22 @@ async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
         result = c.toDataURL('image/png')
       }
       
-      console.log('toBase64Resized result:', {
-        resultLength: result.length,
-        preview: result.substring(0, 50) + '...'
-      })
       
       return result
     } catch (e) {
       console.warn('Failed to detect image type from blob, defaulting to PNG', e)
       const result = c.toDataURL('image/png')
-      console.log('toBase64Resized fallback result:', result.length)
       return result
     }
   } else {
     const result = c.toDataURL('image/png')
-    console.log('toBase64Resized non-blob result:', result.length)
     return result
   }
 }
 
-// New OpenCV-based shadow generation function
-type ShadowOptions = {
-  quality?: 'preview' | 'final'
-  placement?: {
-    scale?: number
-    rotate?: number
-    tx?: number
-    ty?: number
-  }
-  directionDeg?: number
-  distancePx?: number
-  preset?: 'soft' | 'hard' | 'fabric' | 'none'
-  blur?: number
-  opacity?: number
-}
 
-async function generateShadowOpenCV(cutoutBase64: string, options: ShadowOptions = {}, signal?: AbortSignal): Promise<string | null> {
-  try {
-    console.log('generateShadowOpenCV called with options:', options)
-    const response = await fetch('/api/generate-shadow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cutoutImageBase64: cutoutBase64,
-        options
-      }),
-      signal
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('generate-shadow HTTP error:', response.status, errorText)
-      return null
-    }
-
-    const data = await response.json()
-    
-    if (!data.ok) {
-      console.error('Shadow generation failed:', data.error)
-      return null
-    }
-    
-    // Debug logging
-    if (data.debug) {
-      console.log('Shadow generation debug:', data.debug)
-    }
-    if (data.lightSource) {
-      console.log('Light source detected:', data.lightSource)
-    }
-
-    // Convert base64 to blob URL for consistent usage
-    const shadowBase64 = data.shadowLayerBase64
-    if (!shadowBase64) {
-      console.error('No shadow layer returned')
-      return null
-    }
-
-    // Convert to blob URL
-    const base64Data = shadowBase64.replace(/^data:image\/[^;]+;base64,/, '')
-    const binaryData = atob(base64Data)
-    const bytes = new Uint8Array(binaryData.length)
-    
-    for (let i = 0; i < binaryData.length; i++) {
-      bytes[i] = binaryData.charCodeAt(i)
-    }
-    
-    const blob = new Blob([bytes], { type: 'image/png' })
-    return URL.createObjectURL(blob)
-
-  } catch (error: any) {
-    if (signal?.aborted) {
-      console.log('Shadow generation aborted')
-      return null
-    }
-    console.error('Shadow generation error:', error.message, error)
-    return null
-  }
-}
-
-// AI-powered shadow generation using nano banana (Gemini 2.5 Flash Image Preview)
-async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: string, weather: WeatherOption): Promise<string> {
-  console.log('enhanceWithAIShadows called with nano banana', { backgroundColor, weather, cutoutLength: cutoutBase64.length })
+// AI-powered styled image generation using nano banana (Gemini 2.5 Flash Image Preview)
+async function generateStyledImage(cutoutBase64: string, backgroundColor: string, weather: WeatherOption): Promise<string> {
   
   try {
     // Convert backgroundColor to style mapping
@@ -888,7 +632,6 @@ async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: strin
     }
     const style = styleMap[backgroundColor] || 'white'
     
-    console.log(`Using AI shadow generation with style: ${style}, weather: ${weather}`)
     
     // Convert base64 to blob for form data
     const base64Data = cutoutBase64.replace(/^data:image\/[^;]+;base64,/, '')
@@ -907,9 +650,8 @@ async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: strin
     formData.append('style', style)
     formData.append('weather', weather)
     
-    console.log('Calling nano banana API...')
     
-    // Call our AI shadows API
+    // Call our AI styled image API
     const response = await fetch('/api/ai-shadows', {
       method: 'POST',
       body: formData
@@ -917,24 +659,23 @@ async function enhanceWithAIShadows(cutoutBase64: string, backgroundColor: strin
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('AI shadows API error:', response.status, errorText)
+      console.error('AI styled image API error:', response.status, errorText)
       throw new Error(`AI API failed: ${response.status}`)
     }
     
     const result = await response.json()
     
     if (!result.ok) {
-      console.error('AI shadows generation failed:', result.error)
+      console.error('AI styled image generation failed:', result.error)
       throw new Error(result.error || 'AI generation failed')
     }
     
-    console.log('AI shadows generation successful')
     
     // Return the generated image base64
     return result.imageBase64
 
   } catch (error: any) {
-    console.error('enhanceWithAIShadows error:', error.message, error)
+    console.error('generateStyledImage error:', error.message, error)
     // Fallback to original cutout if AI fails
     return cutoutBase64
   }

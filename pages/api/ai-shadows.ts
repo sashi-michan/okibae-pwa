@@ -99,7 +99,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('AI shadows generation started...')
     
     // フォームデータ解析
     const { fields, files } = await parseForm(req)
@@ -125,7 +124,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ ok: false, error: `invalid weather: ${weather}. Valid weather: ${Object.keys(WEATHER_MAP).join(', ')}` })
     }
 
-    console.log(`Processing style: ${style}, weather: ${weather}, file: ${file.originalFilename}`)
 
     // 入力画像を読み込み
     const inputBuffer = fs.readFileSync(file.filepath)
@@ -133,13 +131,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const inputMime = file.mimetype || 'image/jpeg'
     
     // 参考画像を読み込み
-    console.log('Loading reference image for style:', style)
     const referenceImage = loadReferenceImage(style as StyleKey)
     
     const prompt = buildPrompt(style as StyleKey, { weather: weather as WeatherKey })
 
-    console.log('Generated prompt:', prompt)
-    console.log('Calling Gemini API with reference image...')
 
     // Gemini API呼び出し（2つの画像を送信）
     const result = await ai.models.generateContent({
@@ -151,7 +146,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ],
     })
 
-    console.log('Gemini API response received')
 
     // 画像レスポンス抽出
     const parts = result.candidates?.[0]?.content?.parts ?? []
@@ -170,13 +164,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ ok: false, error: 'no image data in response' })
     }
 
-    console.log('AI shadows generation completed successfully')
-    console.log('Output details:', { 
-      style, 
-      weather, 
-      outputSize: outB64.length,
-      mimeType: outMime 
-    })
 
     return res.json({ 
       ok: true,
