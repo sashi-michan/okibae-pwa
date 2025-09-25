@@ -242,10 +242,10 @@ export default function Home() {
     <div className="main-container">
       <div className="mb-6 relative">
         <div className="flex items-center justify-center gap-3 animate-fade-in">
-          <img 
-            src="/okibae-icon.svg" 
-            alt="OKIBAE" 
-            className="h-10 w-10" 
+          <img
+            src="/okibae-icon.svg"
+            alt="OKIBAE"
+            className="h-10 w-10"
           />
           <h1 className="typography-main-title">OKIBAE</h1>
         </div>
@@ -256,6 +256,15 @@ export default function Home() {
         <div className="space-y-6">
           
           <StepCard stepNumber={1} title="画像を選ぶ" className="animate-slide-up">
+            {/* 撮影のコツ */}
+            <div className="mb-4 p-3 bg-gray-100 border border-gray-200 rounded-lg">
+              <ul className="text-xs text-gray-500 space-y-1">
+                <li>• 商品がはっきりわかるように撮る</li>
+                <li>• 平面で撮る</li>
+                <li>• うまくいかないときは、撮る場所を変えてみる</li>
+              </ul>
+            </div>
+
             <label className="btn btn-ghost cursor-pointer">
               <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
               画像を選ぶ
@@ -353,6 +362,18 @@ export default function Home() {
                 画像をダウンロード
               </button>
             )}
+
+            {/* フィードバックリンク */}
+            <div className="mt-4 text-left">
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSf_pkyMpQ0SQXJ--MhNItVSi9LRHW4OBNsUroergJYa396e6w/viewform?usp=header"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-gray-500 hover:text-gray-700 underline decoration-gray-300 hover:decoration-gray-500 transition-colors duration-200"
+              >
+                ぜひ感想をお聞かせください！
+              </a>
+            </div>
           </StepCard>
         </div>
       </div>
