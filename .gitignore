@@ -22,6 +22,10 @@ python/debug_*.py
 # Development and debugging files
 CLAUDE.md
 debug.log
+*.log
+
+# Claude Code settings (personal configuration)
+.claude/
 python/test_*.py
 python/*_debug.log
 python/debug_output*/
