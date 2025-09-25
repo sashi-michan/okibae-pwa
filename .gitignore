@@ -18,6 +18,10 @@ public/originals/
 
 # Python debug and test files (archived versions are preserved)
 python/debug_*.py
+
+# Development and debugging files
+CLAUDE.md
+debug.log
 python/test_*.py
 python/*_debug.log
 python/debug_output*/
