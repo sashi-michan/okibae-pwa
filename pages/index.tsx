@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import StepCard from '../components/StepCard'
 
-type BgOption = 'white' | 'linen' | 'concrete'
+type BgOption = 'white' | 'linen' | 'concrete' | 'wood' | 'white_wood'
 type WeatherOption = 'sunny' | 'cloudy' | 'rainy'
+type AspectRatioOption = 'square' | 'original'
 
 type AppState = {
   phase: 'IDLE' | 'FINAL_RENDERING' | 'FINAL_READY'
@@ -20,6 +21,8 @@ export default function Home() {
   const [imgUrl, setImgUrl] = useState<string>('')
   const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
   const [weather, setWeather] = useState<WeatherOption>('sunny') // デフォルト天気を晴れに設定
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('square') // デフォルトは正方形
+  const [originalSize, setOriginalSize] = useState<{width: number, height: number} | null>(null)
   const [modalImage, setModalImage] = useState<string | null>(null)
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
@@ -55,20 +58,26 @@ export default function Home() {
     const url = URL.createObjectURL(file)
     setImgUrl(url)
     setImageKey(String(Date.now()))
-    
+
+    // 元画像のサイズを取得
+    const img = new Image()
+    img.onload = () => {
+      setOriginalSize({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.src = url
+
     // IDLE状態に設定（完全リセット）
     setAppState({ phase: 'IDLE' })
-    
+
     return () => URL.revokeObjectURL(url)
   }, [file])
 
-  // 司令塔useEffect - 背景除去のみ自動実行
+  // 司令塔useEffect - AI画像生成処理
   useEffect(() => {
     const handleStateTransition = async () => {
       
       switch (appState.phase) {
         case 'IDLE':
-          // nano banana使用のため、背景除去は不要
           break
           
         case 'FINAL_RENDERING':
@@ -84,7 +93,7 @@ export default function Home() {
               return
             }
             const base64 = await toBase64Resized(img, 1536)
-            const enhancedUrl = await generateStyledImage(base64, backgroundColor, weather)
+            const enhancedUrl = await generateStyledImage(base64, backgroundColor, weather, aspectRatio, originalSize)
             
             // nano banana結果をstateに保存してFINAL_READYで描画
             setAppState({ phase: 'FINAL_READY', finalImageUrl: enhancedUrl })
@@ -169,6 +178,8 @@ export default function Home() {
       case 'white': return '#FFFFFF'
       case 'linen': return '#F4EDE4'
       case 'concrete': return '#FAF9F6' // コンクリート背景の基調色
+      case 'wood': return '#D2B48C' // 木目ナチュラル
+      case 'white_wood': return '#F5F5DC' // 木目ホワイト
       default: return '#FFFFFF'
     }
   }
@@ -296,18 +307,24 @@ export default function Home() {
           </StepCard>
           
           <StepCard stepNumber={4} title="保存" className="animate-slide-up">
-            {appState.phase !== 'FINAL_READY' ? (
-              <button 
-                className="btn btn-primary disabled:opacity-50 mb-4" 
-                onClick={handleGenerateFinal} 
-                disabled={!imgUrl || appState.phase === 'FINAL_RENDERING' || (!DEBUG_MODE && dailyUsage.count >= 5)}
-              >
-                {(!DEBUG_MODE && dailyUsage.count >= 5) ? '本日の上限に達しました' : 
-                 appState.phase === 'FINAL_RENDERING' ? '生成中...' : '生成！'}
-              </button>
-            ) : (
-              <div className="text-sm text-green-600 mb-4">✓ 生成完了</div>
-            )}
+            {/* サイズ選択UI - Vertex AI制限により一時的に非表示
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">出力サイズ</label>
+              <div className="flex items-center gap-2 mb-4">
+                <AspectRatioBadge current={aspectRatio} value="square" label="正方形 (1:1)" onClick={setAspectRatio} />
+                <AspectRatioBadge current={aspectRatio} value="original" label="元のサイズ" onClick={setAspectRatio} disabled={!originalSize} />
+              </div>
+            </div>
+            */}
+            <button
+              className="btn btn-primary disabled:opacity-50 mb-4"
+              onClick={handleGenerateFinal}
+              disabled={!imgUrl || appState.phase === 'FINAL_RENDERING' || (!DEBUG_MODE && dailyUsage.count >= 5)}
+            >
+              {(!DEBUG_MODE && dailyUsage.count >= 5) ? '本日の上限に達しました' :
+               appState.phase === 'FINAL_RENDERING' ? '生成中...' :
+               appState.phase === 'FINAL_READY' ? '再生成！' : '生成！'}
+            </button>
             <div className="mb-4">
               {appState.phase === 'IDLE' ? (
                 <div className="aspect-square w-full border-2 border-dashed border-gray-300 rounded-xl grid place-content-center text-gray-400 text-sm">
@@ -321,10 +338,13 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <canvas 
-                  ref={canvasRef} 
-                  className="max-w-full border rounded-xl"
-                />
+                <div className="relative">
+                  <canvas
+                    ref={canvasRef}
+                    className="max-w-full border rounded-xl"
+                  />
+                  <div className="text-sm text-green-600 mt-2 text-right">✓ 生成完了</div>
+                </div>
               )}
             </div>
             
@@ -372,9 +392,11 @@ function BackgroundCarousel({ current, onChange, setModalImage }: { current: BgO
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
   
   const backgrounds: Array<{ value: BgOption; label: string; image: string }> = [
-    { value: 'white', label: '白画用紙', image: '/input_image/sample_white.jpeg' },
-    { value: 'linen', label: 'リネン布', image: '/input_image/sample_linen.jpeg' },
-    { value: 'concrete', label: 'コンクリート', image: '/input_image/sample_concrete.jpeg' }
+    { value: 'white', label: '白画用紙', image: '/input_image/sample_white.png' },
+    { value: 'linen', label: '木綿', image: '/input_image/sample_cotton.png' },
+    { value: 'concrete', label: 'コンクリート', image: '/input_image/sample_concrete.png' },
+    { value: 'wood', label: '木目ナチュラル', image: '/input_image/sample_wood.png' },
+    { value: 'white_wood', label: '木目ホワイト', image: '/input_image/sample_white_wood.png' }
   ]
 
   // current値からindexを初期化
@@ -508,12 +530,36 @@ function BackgroundCarousel({ current, onChange, setModalImage }: { current: BgO
   )
 }
 
-function WeatherBadge({ current, value, label, color, onClick }:{ 
-  current: WeatherOption | null, 
-  value: WeatherOption, 
-  label: string, 
+function AspectRatioBadge({ current, value, label, onClick, disabled = false }:{
+  current: AspectRatioOption,
+  value: AspectRatioOption,
+  label: string,
+  onClick: (v: AspectRatioOption)=>void,
+  disabled?: boolean
+}) {
+  const active = current === value
+
+  return (
+    <button
+      onClick={() => !disabled && onClick(value)}
+      disabled={disabled}
+      className={clsx(
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button hover:shadow-lg border",
+        active ? "bg-brand-500 text-white border-brand-500" : "bg-white text-gray-600 border-gray-200 hover:border-brand-300",
+        disabled && "opacity-50 cursor-not-allowed"
+      )}
+    >
+      <span>{label}</span>
+    </button>
+  )
+}
+
+function WeatherBadge({ current, value, label, color, onClick }:{
+  current: WeatherOption | null,
+  value: WeatherOption,
+  label: string,
   color: WeatherOption,
-  onClick: (v: WeatherOption)=>void | Promise<void> 
+  onClick: (v: WeatherOption)=>void | Promise<void>
 }) {
   const active = current === value
   
@@ -655,14 +701,16 @@ async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
 
 
 // AI-powered styled image generation using nano banana (Gemini 2.5 Flash Image Preview)
-async function generateStyledImage(cutoutBase64: string, backgroundColor: string, weather: WeatherOption): Promise<string> {
+async function generateStyledImage(cutoutBase64: string, backgroundColor: string, weather: WeatherOption, aspectRatio: AspectRatioOption, originalSize: {width: number, height: number} | null): Promise<string> {
   
   try {
     // Convert backgroundColor to style mapping
     const styleMap: Record<string, string> = {
       '#FFFFFF': 'white',
-      '#F4EDE4': 'linen', 
-      '#FAF9F6': 'concrete'
+      '#F4EDE4': 'linen',
+      '#FAF9F6': 'concrete',
+      '#D2B48C': 'wood',
+      '#F5F5DC': 'white_wood'
     }
     const style = styleMap[backgroundColor] || 'white'
     
@@ -683,6 +731,11 @@ async function generateStyledImage(cutoutBase64: string, backgroundColor: string
     formData.append('file', blob, 'cutout.png')
     formData.append('style', style)
     formData.append('weather', weather)
+    formData.append('aspectRatio', aspectRatio)
+    if (originalSize) {
+      formData.append('originalWidth', originalSize.width.toString())
+      formData.append('originalHeight', originalSize.height.toString())
+    }
     
     
     // Call our AI styled image API

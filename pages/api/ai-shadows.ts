@@ -4,12 +4,14 @@ import formidable from 'formidable'
 import fs from 'fs'
 import path from 'path'
 
-type StyleKey = "white" | "linen" | "concrete";
+type StyleKey = "white" | "linen" | "concrete" | "wood" | "white_wood";
 type WeatherKey = "sunny" | "cloudy" | "rainy";
 
 type BuildOpts = {
   weather?: WeatherKey;
   addPearlShadow?: boolean;    // 真珠など小パーツの副次影
+  aspectRatio?: 'square' | 'original';
+  originalSize?: { width: number; height: number };
 };
 
 // formidableでファイルアップロード処理
@@ -34,22 +36,36 @@ const vertexAI = new VertexAI({
   apiEndpoint: 'aiplatform.googleapis.com',  // globalエンドポイントを明示
 });
 
-const generativeModel = vertexAI.preview.getGenerativeModel({
-  model: 'gemini-2.5-flash-image-preview',
-});
+// モデルインスタンスを毎回新規作成（コメントアウト）
+// const generativeModel = vertexAI.preview.getGenerativeModel({
+//   model: 'gemini-2.5-flash-image-preview',
+// });
 
-// 参考画像のパスマップ
-const REFERENCE_IMAGES: Record<StyleKey, string> = {
-  white: 'input_image/sample_white.jpeg',
-  linen: 'input_image/sample_linen.jpeg', 
-  concrete: 'input_image/sample_concrete.jpeg',
+// 参考画像のパスマップ（複数画像対応）
+const REFERENCE_IMAGES: Record<StyleKey, string[]> = {
+  white: ['public/input_image/sample_white.png', 'public/input_image/sample_white_angled.png'],
+  linen: ['public/input_image/sample_cotton.png', 'public/input_image/sample_cotton_angled.png'],
+  concrete: ['public/input_image/sample_concrete.png', 'public/input_image/sample_concrete_angled.png'],
+  wood: ['public/input_image/sample_wood.png', 'public/input_image/sample_wood_angled.png'],
+  white_wood: ['public/input_image/sample_white_wood.png', 'public/input_image/sample_white_wood_angled.png'],
 };
 
 // 背景説明マップ
 const BACKGROUND_DESCRIPTIONS: Record<StyleKey, string> = {
-  white: "A reference photo showing textured white watercolor paper background",
-  linen: "A reference photo showing natural beige linen fabric background",
-  concrete: "A reference photo showing light gray concrete surface background",
+  white: "Reference photos showing textured white watercolor paper background from different angles",
+  linen: "Reference photos showing natural beige cotton fabric background from different angles",
+  concrete: "Reference photos showing light gray concrete surface background from different angles",
+  wood: "Reference photos showing natural wood grain surface background from different angles",
+  white_wood: "Reference photos showing white painted wood surface background from different angles",
+};
+
+// シミュレーション用の背景説明マップ
+const SIMULATION_DESCRIPTIONS: Record<StyleKey, string> = {
+  white: "a realistic textured white watercolor paper surface",
+  linen: "a realistic natural beige cotton fabric surface",
+  concrete: "a realistic light gray concrete surface",
+  wood: "a realistic natural wood grain surface",
+  white_wood: "a realistic white painted wood surface",
 };
 
 const WEATHER_MAP: Record<WeatherKey, string> = {
@@ -61,44 +77,102 @@ const WEATHER_MAP: Record<WeatherKey, string> = {
 };
 
 
+// 参考画像説明マップ
+const REFERENCE_DESCRIPTIONS: Record<StyleKey, string> = {
+  white: `The second image should guide overall atmosphere and light feeling.
+The third image helps define the paper texture and surface angle.
+This is white watercolor / cold-press drawing paper with fine tooth and soft dimples.
+This is not copy paper.
+Render the paper surface with visible foreshortening from an oblique viewing angle.
+Keep the paper flat but receding in space. Do not warp the product.`,
+
+  linen: `The second image should guide overall atmosphere and light feeling.
+The third image helps define the fabric texture and direction of folds.
+This is soft Japanese cotton with visible neps.
+This is not linen — avoid rough or European-style interpretations.`,
+
+  concrete: `The second image should guide overall atmosphere and light feeling.
+The third image helps define the concrete surface texture and perspective.
+This is smooth, light gray concrete with subtle pores and fine speckling.`,
+
+  wood: `The second image should guide overall atmosphere and light feeling.
+The third image helps define the wood surface texture and grain direction.
+This is a smooth, light-colored natural wood surface, with subtle linear grain.
+The wood surface should follow the angle shown in the reference image.`,
+
+  white_wood: `The second image should guide overall atmosphere and light feeling.
+The third image helps define the wood surface texture and grain direction.
+This is a smooth, white painted wood surface, with subtle linear grain.
+The wood surface should follow the angle shown in the reference image.`,
+};
+
+// 天気説明マップ（詳細版）
+const WEATHER_DESCRIPTIONS: Record<WeatherKey, string> = {
+  sunny: `Simulate sunny daylight with soft shadows and a bright, airy mood.
+Override the lighting from the second image — use it only for color tone and general mood.
+The atmosphere should feel warm and cheerful, like a bright sunny day.`,
+
+  cloudy: `Simulate overcast daylight with diffuse, soft light. No strong shadows.
+Override the lighting from the second image — use it only for color tone and general mood.
+The overall mood should feel calm, soft, and quiet — like a cloudy day.`,
+
+  rainy: `Simulate rainy daylight with soft ambient light and no strong shadows.
+Override the lighting from the second image — use it only for color tone and general mood.
+The atmosphere should feel muted and introspective, like a quiet rainy afternoon.
+Colors should be slightly desaturated to match the mood.`,
+};
+
 export function buildPrompt(style: StyleKey, opts: BuildOpts = {}) {
-  const weather = WEATHER_MAP[opts.weather ?? "sunny"];
-  const backgroundDesc = BACKGROUND_DESCRIPTIONS[style] ?? BACKGROUND_DESCRIPTIONS.white;
+  const weatherDesc = WEATHER_DESCRIPTIONS[opts.weather ?? "sunny"];
+  const referenceDesc = REFERENCE_DESCRIPTIONS[style] ?? REFERENCE_DESCRIPTIONS.white;
   const tinyPartShadow = opts.addPearlShadow
     ? "Include tiny secondary shadows from small decorative parts."
     : "";
 
-  return `You are an ecommerce photo retoucher.
+  // Output サイズ指定
+  let outputSpec = "square (1024×1024)";
+  if (opts.aspectRatio === 'original' && opts.originalSize) {
+    const { width, height } = opts.originalSize;
+    outputSpec = `${width}×${height} (original aspect ratio)`;
+  }
 
-1ST IMAGE: A product photo of a handmade item taken on a random background.  
-2ND IMAGE: ${backgroundDesc}.
+  return `Use ONLY the product from the 1st image.
 
-TASK: Replace the background in the first image with the same background texture and composition as the second image.  
-Then, ${weather}.
+Rebuild the background inspired by the mood, color tone, and lighting of the 2nd image,
+and based on the surface texture and angle shown in the 3rd image.
+Do not change the product's shape, proportions, or style in any way.
+Adjust only the lighting and color temperature to harmonize with the background environment.
+Do not add, remove, or modify any parts or components of the product.
+Keep the product within the visible boundaries shown in the first image.
 
-Requirements:
-- Keep the product from the first image exactly as it is (shape, color, texture)
-- Use only the background from the second image (surface texture, lighting style)
-- **Imagine placing the product directly onto the reference surface** - the background should look like the same table/paper that the product is naturally sitting on
-- If the product appears to be photographed from above at an angle, make the background surface also appear tilted toward the camera in the same way
-- The final result should look like one continuous photo where the product was always on that surface
-- The output should look like a natural photo with appropriate lighting
-- Final image must be cropped square (1:1), with no added objects or borders
-${tinyPartShadow ? `- ${tinyPartShadow}` : ''}
-  `.trim();
+${referenceDesc}
+
+Imagine the background in the 3rd image has been physically placed under the product.
+Recreate the surface based on that image, not the original photo.
+
+${weatherDesc}
+
+Make the background look natural and seamless, as if the product was originally photographed on it.
+Match the background's depth of field to the product's focus plane to avoid artificial blending.
+
+Output: ${outputSpec}, clean photo, no props or text.
+${tinyPartShadow ? `\n${tinyPartShadow}` : ''}`.trim();
 }
 
-// 参考画像を読み込む関数
-function loadReferenceImage(style: StyleKey): { base64: string; mime: string } {
+// 参考画像を読み込む関数（複数画像対応）
+function loadReferenceImages(style: StyleKey): { base64: string; mime: string }[] {
   try {
-    const imagePath = path.join(process.cwd(), REFERENCE_IMAGES[style]);
-    const buffer = fs.readFileSync(imagePath);
-    const base64 = buffer.toString('base64');
-    const mime = 'image/jpeg'; // すべてjpegと仮定
-    return { base64, mime };
+    const imagePaths = REFERENCE_IMAGES[style];
+    return imagePaths.map(imagePath => {
+      const fullPath = path.join(process.cwd(), imagePath);
+      const buffer = fs.readFileSync(fullPath);
+      const base64 = buffer.toString('base64');
+      const mime = 'image/png'; // すべてpngに変更
+      return { base64, mime };
+    });
   } catch (error) {
-    console.error(`Failed to load reference image for style ${style}:`, error);
-    throw new Error(`Reference image not found for style: ${style}`);
+    console.error(`Failed to load reference images for style ${style}:`, error);
+    throw new Error(`Reference images not found for style: ${style}`);
   }
 }
 
@@ -115,6 +189,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // スタイルとファイル取得
     const style = String(Array.isArray(fields.style) ? fields.style[0] : fields.style || 'white').toLowerCase()
     const weather = String(Array.isArray(fields.weather) ? fields.weather[0] : fields.weather || 'sunny').toLowerCase()
+    const aspectRatio = String(Array.isArray(fields.aspectRatio) ? fields.aspectRatio[0] : fields.aspectRatio || 'square') as 'square' | 'original'
+    const originalWidth = fields.originalWidth ? parseInt(String(Array.isArray(fields.originalWidth) ? fields.originalWidth[0] : fields.originalWidth)) : undefined
+    const originalHeight = fields.originalHeight ? parseInt(String(Array.isArray(fields.originalHeight) ? fields.originalHeight[0] : fields.originalHeight)) : undefined
     const fileArray = Array.isArray(files.file) ? files.file : [files.file]
     const file = fileArray[0]
     
@@ -139,10 +216,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const inputBase64 = inputBuffer.toString('base64')
     const inputMime = file.mimetype || 'image/jpeg'
     
-    // 参考画像を読み込み
-    const referenceImage = loadReferenceImage(style as StyleKey)
+    // 参考画像を読み込み（複数）
+    const referenceImages = loadReferenceImages(style as StyleKey)
     
-    const prompt = buildPrompt(style as StyleKey, { weather: weather as WeatherKey })
+    const originalSize = originalWidth && originalHeight ? { width: originalWidth, height: originalHeight } : undefined
+    const prompt = buildPrompt(style as StyleKey, {
+      weather: weather as WeatherKey,
+      aspectRatio,
+      originalSize
+    })
+
+    // ログファイルに出力
+    const logData = `=== ${new Date().toISOString()} ===\nStyle: ${style}\nWeather: ${weather}\nPrompt:\n${prompt}\n\n`
+    fs.appendFileSync('debug.log', logData)
+
+    console.log('=== GENERATED PROMPT ===')
+    console.log(prompt)
+    console.log('=== END PROMPT ===')
 
 
     // Vertex AI Gemini API呼び出し（2つの画像を送信）
@@ -151,28 +241,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Calling Vertex AI with model:', 'gemini-2.5-flash-image-preview')
       console.log('Project:', process.env.GOOGLE_CLOUD_PROJECT)
       console.log('Location:', process.env.GOOGLE_CLOUD_LOCATION)
-      
+
+      // 毎回新しいモデルインスタンスを作成してセッション独立性を確保
+      const freshGenerativeModel = vertexAI.preview.getGenerativeModel({
+        model: 'gemini-2.5-flash-image-preview',
+      });
+
       // Base64データの確認
       console.log('Input image MIME:', inputMime)
       console.log('Input base64 length:', inputBase64.length)
       console.log('Input base64 starts with:', inputBase64.substring(0, 20))
-      console.log('Reference image MIME:', referenceImage.mime)
-      console.log('Reference base64 length:', referenceImage.base64.length)
-      console.log('Reference base64 starts with:', referenceImage.base64.substring(0, 20))
-      
-      result = await generativeModel.generateContent({
+      console.log('Reference images count:', referenceImages.length)
+      referenceImages.forEach((img, index) => {
+        console.log(`Reference image ${index + 1} MIME:`, img.mime)
+        console.log(`Reference image ${index + 1} base64 length:`, img.base64.length)
+        console.log(`Reference image ${index + 1} base64 starts with:`, img.base64.substring(0, 20))
+      })
+
+      const parts = [
+        { text: prompt },
+        { inlineData: { mimeType: inputMime, data: inputBase64 } }, // 1ST IMAGE: 商品画像
+        ...referenceImages.map(img => ({ inlineData: { mimeType: img.mime, data: img.base64 } })) // 2ND, 3RD IMAGE: 参考画像
+      ];
+
+      result = await freshGenerativeModel.generateContent({
         contents: [{
           role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: inputMime, data: inputBase64 } },      // 1ST IMAGE: 商品画像
-            { inlineData: { mimeType: referenceImage.mime, data: referenceImage.base64 } }, // 2ND IMAGE: 参考画像
-          ]
+          parts: parts
         }],
         generationConfig: {
           maxOutputTokens: 1024,
-          temperature: 0.1,
-          topP: 0.8,
+          temperature: 0.1,  // 低めにして一貫性向上
+          topP: 0.4,         // 安定性重視
           // 画像とテキストの両方を出力として指定
           responseModalities: ['TEXT', 'IMAGE']
         }
@@ -215,7 +315,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         inputWeather: weather,
         outputMimeType: outMime,
         outputLength: outB64.length,
-        referenceImageUsed: REFERENCE_IMAGES[style as StyleKey]
+        referenceImagesUsed: REFERENCE_IMAGES[style as StyleKey]
       }
     })
 

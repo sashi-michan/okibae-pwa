@@ -189,33 +189,7 @@ body {
   overflow: hidden;
 }
 
-.main-container::before {
-  content: '';
-  position: fixed;
-  top: 20%;
-  left: 10%;
-  width: 100px;
-  height: 100px;
-  background: radial-gradient(circle, rgba(255, 182, 193, 0.1) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-}
 
-.main-container::after {
-  content: '';
-  position: fixed;
-  top: 60%;
-  right: 15%;
-  width: 60px;
-  height: 60px;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 6s ease-in-out infinite reverse;
-  pointer-events: none;
-  z-index: 0;
-}
 
 /* インタラクティブ要素 */
 .interactive-card { 
@@ -257,6 +231,10 @@ body {
   @apply w-full h-full object-cover rounded-xl;
   opacity: 0.4;
   transition: opacity 0.5s ease, transform 0.3s ease;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .slick-slide:hover .slick-slide-image {
