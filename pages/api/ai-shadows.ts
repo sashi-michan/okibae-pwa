@@ -272,9 +272,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         generationConfig: {
           maxOutputTokens: 1024,
           temperature: 0.1,  // 低めにして一貫性向上
-          topP: 0.4,         // 安定性重視
-          // 画像とテキストの両方を出力として指定
-          responseModalities: ['TEXT', 'IMAGE']
+          topP: 0.4         // 安定性重視
         }
       })
     } catch (e: any) {
