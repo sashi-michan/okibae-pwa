@@ -122,3 +122,39 @@ OKIBAE is a web-based PWA tool designed for handmade creators (especially macram
 - SVGアイコンの統一感が高い
 - カルーセルのスワイプ対応が完璧に動作
 - CSS詳細度問題は`!important`＋親セレクタで解決
+
+## 🔄 現在進行中のタスク（2025-09-16）
+
+### ✅ 完了済み
+1. **Vertex AI移行完成**
+   - Google GenAI → Vertex AI SDK完全移行
+   - 透かしなし画像生成実現（SynthID非可視透かしのみ）
+   - `gemini-2.5-flash-image-preview`モデル使用
+   - 認証：サービスアカウント + JSON キーファイル
+
+2. **モーダル表示修正**
+   - 背景画像クリック時の全画面モーダル実装
+   - カード内表示 → 画面全体表示に修正
+
+3. **プロンプト改善（複数回試行）**
+   - ChatGPTアドバイスによる段階的改善
+   - パース問題・参考画像混入問題を解決
+   - 最新プロンプト：「物理的配置」アプローチで混同防止
+
+### 🔥 現在の問題
+- **白画用紙背景のパース調整がうまくいかない**
+  - リネン・コンクリートは成功率高い
+  - 白画用紙だけパースが平面になりがち
+  - nano banana（gemini-2.5-flash-image-preview）の特性かも
+
+### 🎯 次のアクション
+1. **白背景用複数参考画像追加予定**
+   - `sample_white_flat.jpeg` (平置き)
+   - `sample_white_angled.jpeg` (斜め置き)
+   - 複数ヒント提供でパース理解向上を狙う
+
+### 💻 技術的状況
+- 開発サーバー：2つのインスタンス稼働中（ports 3000/3001）
+- ユーザーはPC再起動予定
+- 現在のブランチ：`feature/agent/ui-styling`
+- 最新コミット：Vertex AI移行完了
