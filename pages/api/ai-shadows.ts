@@ -160,16 +160,37 @@ ${tinyPartShadow ? `\n${tinyPartShadow}` : ''}`.trim();
 }
 
 // 参考画像を読み込む関数（複数画像対応）
-function loadReferenceImages(style: StyleKey): { base64: string; mime: string }[] {
+async function loadReferenceImages(style: StyleKey, req: NextApiRequest): Promise<{ base64: string; mime: string }[]> {
   try {
     const imagePaths = REFERENCE_IMAGES[style];
-    return imagePaths.map(imagePath => {
-      const fullPath = path.join(process.cwd(), imagePath);
-      const buffer = fs.readFileSync(fullPath);
-      const base64 = buffer.toString('base64');
-      const mime = 'image/png'; // すべてpngに変更
-      return { base64, mime };
+    const baseUrl = `https://${req.headers.host}`;
+
+    const imagePromises = imagePaths.map(async (imagePath) => {
+      try {
+        // ローカル環境ではファイルシステムから読み込み
+        if (process.env.NODE_ENV === 'development') {
+          const fullPath = path.join(process.cwd(), imagePath);
+          const buffer = fs.readFileSync(fullPath);
+          const base64 = buffer.toString('base64');
+          return { base64, mime: 'image/png' };
+        } else {
+          // 本番環境（Vercel）ではHTTP経由で取得
+          const imageUrl = `${baseUrl}/${imagePath.replace('public/', '')}`;
+          const response = await fetch(imageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${imageUrl}: ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          return { base64, mime: 'image/png' };
+        }
+      } catch (error) {
+        console.error(`Failed to load image ${imagePath}:`, error);
+        throw error;
+      }
     });
+
+    return await Promise.all(imagePromises);
   } catch (error) {
     console.error(`Failed to load reference images for style ${style}:`, error);
     throw new Error(`Reference images not found for style: ${style}`);
@@ -217,7 +238,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const inputMime = file.mimetype || 'image/jpeg'
     
     // 参考画像を読み込み（複数）
-    const referenceImages = loadReferenceImages(style as StyleKey)
+    const referenceImages = await loadReferenceImages(style as StyleKey, req)
     
     const originalSize = originalWidth && originalHeight ? { width: originalWidth, height: originalHeight } : undefined
     const prompt = buildPrompt(style as StyleKey, {
