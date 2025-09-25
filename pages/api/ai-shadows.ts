@@ -247,9 +247,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       originalSize
     })
 
-    // ログファイルに出力
+    // ログ出力（環境別）
     const logData = `=== ${new Date().toISOString()} ===\nStyle: ${style}\nWeather: ${weather}\nPrompt:\n${prompt}\n\n`
-    fs.appendFileSync('debug.log', logData)
+
+    if (process.env.NODE_ENV === 'development') {
+      // 開発環境：ファイルに保存
+      fs.appendFileSync('debug.log', logData)
+    } else {
+      // 本番環境（Vercel）：コンソールのみ（Vercelログで確認可能）
+      console.log('=== PROMPT LOG ===')
+      console.log(`Style: ${style}, Weather: ${weather}`)
+      console.log('Prompt:', prompt)
+    }
 
     console.log('=== GENERATED PROMPT ===')
     console.log(prompt)
