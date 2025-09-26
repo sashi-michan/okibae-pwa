@@ -237,6 +237,44 @@ export default function Home() {
     a.href = url; a.download = 'okibae.png'; a.click()
   }
 
+  const handleShare = async () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    try {
+      // Canvas を Blob に変換
+      canvas.toBlob(async (blob) => {
+        if (!blob) return
+
+        // WebShare API が利用可能かチェック
+        if (navigator.share && navigator.canShare) {
+          const file = new File([blob], 'okibae.png', { type: 'image/png' })
+          const shareData = {
+            title: 'OKIBAE - 置き画',
+            text: 'OKIBAEで作成した置き画です✨',
+            files: [file]
+          }
+
+          // ファイル共有がサポートされているかチェック
+          if (navigator.canShare(shareData)) {
+            await navigator.share(shareData)
+            return
+          }
+        }
+
+        // フォールバック：ダウンロードに変更
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'okibae.png'
+        a.click()
+        URL.revokeObjectURL(url)
+      }, 'image/png')
+    } catch (error) {
+      console.error('Share failed:', error)
+    }
+  }
+
 
   return (
     <div className="main-container">
@@ -358,9 +396,36 @@ export default function Home() {
             </div>
             
             {appState.phase === 'FINAL_READY' && (
-              <button className="btn btn-ghost" onClick={handleSave}>
-                画像をダウンロード
-              </button>
+              <div className="flex items-center gap-3">
+                <button className="btn btn-ghost" onClick={handleSave}>
+                  画像をダウンロード
+                </button>
+                <button
+                  className="btn btn-ghost p-2 flex items-center gap-2"
+                  onClick={handleShare}
+                  title="共有"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 48 48"
+                    className="w-5 h-5"
+                  >
+                    <defs>
+                      <style>{`.cls-1,.cls-2{fill:none;}.cls-2{stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:4px;}`}</style>
+                    </defs>
+                    <g>
+                      <rect className="cls-1" width="48" height="48"/>
+                    </g>
+                    <g>
+                      <polyline className="cls-2" points="6 34.83 6 41.83 42 41.83 42 34.83"/>
+                      <line className="cls-2" x1="24" y1="32.82" x2="24" y2="18.82"/>
+                      <line className="cls-2" x1="24" y1="9" x2="13" y2="20"/>
+                      <line className="cls-2" x1="24" y1="9" x2="35" y2="20"/>
+                    </g>
+                  </svg>
+                  共有
+                </button>
+              </div>
             )}
 
             {/* フィードバックリンク */}
