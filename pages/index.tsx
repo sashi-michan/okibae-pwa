@@ -27,9 +27,35 @@ export default function Home() {
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE' })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
   const [dailyUsage, setDailyUsage] = useState({ count: 0, date: '' })
+  const [showLineBrowserDialog, setShowLineBrowserDialog] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // LINE ブラウザ検出
+  useEffect(() => {
+    const isLineBrowser = () => {
+      const userAgent = navigator.userAgent.toLowerCase()
+      console.log('User Agent:', userAgent) // デバッグ用
+
+      // URLパラメータでテスト可能にする
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('line-test') === 'true') {
+        console.log('LINE Browser test mode enabled!')
+        return true
+      }
+
+      return userAgent.includes('line/') ||
+             userAgent.includes('line ') ||
+             userAgent.includes('linelite') ||
+             userAgent.includes('line_app')
+    }
+
+    if (isLineBrowser()) {
+      console.log('LINE Browser detected!') // デバッグ用
+      setShowLineBrowserDialog(true)
+    }
+  }, [])
 
   // 日次使用制限の管理
   useEffect(() => {
@@ -232,6 +258,18 @@ export default function Home() {
   const handleSave = async () => {
     const canvas = canvasRef.current
     if (!canvas) return
+
+    // LINE ブラウザの場合は警告ダイアログを表示
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isLineBrowser = userAgent.includes('line/') ||
+                         userAgent.includes('line ') ||
+                         userAgent.includes('linelite') ||
+                         userAgent.includes('line_app')
+    if (isLineBrowser) {
+      setShowLineBrowserDialog(true)
+      return
+    }
+
     const url = canvas.toDataURL('image/png')
     const a = document.createElement('a')
     a.href = url; a.download = 'okibae.png'; a.click()
@@ -240,6 +278,17 @@ export default function Home() {
   const handleShare = async () => {
     const canvas = canvasRef.current
     if (!canvas) return
+
+    // LINE ブラウザの場合は警告ダイアログを表示
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isLineBrowser = userAgent.includes('line/') ||
+                         userAgent.includes('line ') ||
+                         userAgent.includes('linelite') ||
+                         userAgent.includes('line_app')
+    if (isLineBrowser) {
+      setShowLineBrowserDialog(true)
+      return
+    }
 
     try {
       // Canvas を Blob に変換
@@ -445,15 +494,15 @@ export default function Home() {
       
       {/* モーダル表示 - 全画面表示のため最上位レベルに配置 */}
       {modalImage && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
           onClick={() => setModalImage(null)}
         >
-          <div 
+          <div
             className="relative max-w-2xl max-h-[80vh] m-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <img 
+            <img
               src={modalImage}
               alt="背景プレビュー"
               className="w-full h-full object-contain rounded-lg max-w-full max-h-full"
@@ -464,6 +513,101 @@ export default function Home() {
             >
               ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* LINE ブラウザ警告ダイアログ */}
+      {showLineBrowserDialog && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={() => setShowLineBrowserDialog(false)}
+        >
+          <div
+            className="relative max-w-sm mx-4 bg-white rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{ borderColor: '#D6C5D540', borderWidth: '1px' }}
+          >
+            <div className="p-6">
+              <div className="text-center mb-4">
+                <div
+                  className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: '#EDBC9D20', borderColor: '#EDBC9D40', borderWidth: '2px' }}
+                >
+                  <svg className="w-8 h-8" style={{ color: '#EDBC9D' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">LINEブラウザでは画像を保存できません</h3>
+                <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                  LINEブラウザでは、画像のダウンロードや共有ができません。<br />
+                  他のブラウザで開いてお試しください。
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    const currentUrl = window.location.href
+                    // スマートフォンの場合はChromeで開く
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                    if (isMobile) {
+                      // Chrome で開くためのスキーム
+                      window.open(`googlechrome://${currentUrl}`, '_blank')
+                      // フォールバック用に通常のURLも開く
+                      setTimeout(() => {
+                        window.open(currentUrl, '_blank')
+                      }, 1000)
+                    } else {
+                      window.open(currentUrl, '_blank')
+                    }
+                  }}
+                  className="w-full text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                  style={{ backgroundColor: '#C792A3' }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#B8829'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#C792A3'}
+                >
+                  ブラウザで開く
+                </button>
+
+                <button
+                  onClick={() => {
+                    // URLをクリップボードにコピー
+                    navigator.clipboard.writeText(window.location.href).then(() => {
+                      alert('URLをコピーしました！\nブラウザのアドレスバーに貼り付けてアクセスしてください。')
+                    }).catch(() => {
+                      // フォールバック：URLを表示
+                      prompt('URLをコピーしてブラウザで開いてください：', window.location.href)
+                    })
+                  }}
+                  className="w-full py-3 px-4 rounded-xl font-medium transition-colors"
+                  style={{
+                    backgroundColor: '#D6C5D520',
+                    color: '#8B7086',
+                    borderColor: '#D6C5D560',
+                    borderWidth: '1px'
+                  }}
+                >
+                  URLをコピー
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowLineBrowserDialog(false)}
+                className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-colors rounded-full"
+                style={{ color: '#D6C5D580' }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = '#D6C5D520';
+                  (e.target as HTMLButtonElement).style.color = '#D6C5D5'
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                  (e.target as HTMLButtonElement).style.color = '#D6C5D580'
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
       )}
