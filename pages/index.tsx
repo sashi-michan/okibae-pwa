@@ -395,7 +395,7 @@ export default function Home() {
           </StepCard>
           
           <StepCard stepNumber={3} title="天気を選ぶ" className="animate-slide-up">
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4 flex flex-col sm:flex-row items-center sm:items-start sm:justify-start justify-center gap-3 sm:gap-2">
               <WeatherBadge current={weather} value="sunny" label="晴れ" color="sunny" onClick={handleWeatherPreset} />
               <WeatherBadge current={weather} value="cloudy" label="くもり" color="cloudy" onClick={handleWeatherPreset} />
               <WeatherBadge current={weather} value="rainy" label="雨" color="rainy" onClick={handleWeatherPreset} />
@@ -446,11 +446,11 @@ export default function Home() {
             
             {appState.phase === 'FINAL_READY' && (
               <div className="flex items-center gap-3">
-                <button className="btn btn-ghost" onClick={handleSave}>
-                  画像をダウンロード
+                <button className="btn btn-ghost whitespace-nowrap" onClick={handleSave}>
+                  ダウンロード
                 </button>
                 <button
-                  className="btn btn-ghost p-2 flex items-center gap-2"
+                  className="btn btn-ghost p-2 flex items-center gap-2 whitespace-nowrap"
                   onClick={handleShare}
                   title="共有"
                 >
@@ -847,7 +847,7 @@ function WeatherBadge({ current, value, label, color, onClick }:{
     <button
       onClick={() => onClick(value)}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 font-medium shadow-soft transition-all duration-300 typography-button hover:shadow-lg border",
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 font-medium shadow-soft transition-all duration-300 typography-button hover:shadow-lg border w-full sm:w-auto min-w-[100px]",
         colorStyles[color]
       )}
       style={backgroundStyles[color]}
