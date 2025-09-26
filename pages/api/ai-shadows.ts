@@ -29,12 +29,30 @@ const parseForm = (req: NextApiRequest): Promise<{ fields: formidable.Fields; fi
   })
 }
 
-// Vertex AI クライアントの初期化
-const vertexAI = new VertexAI({
-  project: process.env.GOOGLE_CLOUD_PROJECT!,
-  location: process.env.GOOGLE_CLOUD_LOCATION || 'global',
-  apiEndpoint: 'aiplatform.googleapis.com',  // globalエンドポイントを明示
-});
+// Vertex AI クライアントの初期化（環境別認証）
+function createVertexAI() {
+  const config: any = {
+    project: process.env.GOOGLE_CLOUD_PROJECT!,
+    location: process.env.GOOGLE_CLOUD_LOCATION || 'global',
+    apiEndpoint: 'aiplatform.googleapis.com'
+  };
+
+  // 本番環境（Vercel）では環境変数からJSONを読み込み
+  if (process.env.NODE_ENV === 'production' && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      config.googleAuthOptions = {
+        credentials: credentials
+      };
+      console.log('Using JSON credentials for Vertex AI authentication');
+    } catch (error) {
+      console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error);
+      throw new Error('Invalid Google Cloud credentials');
+    }
+  }
+
+  return new VertexAI(config);
+}
 
 // モデルインスタンスを毎回新規作成（コメントアウト）
 // const generativeModel = vertexAI.preview.getGenerativeModel({
@@ -272,7 +290,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Project:', process.env.GOOGLE_CLOUD_PROJECT)
       console.log('Location:', process.env.GOOGLE_CLOUD_LOCATION)
 
-      // 毎回新しいモデルインスタンスを作成してセッション独立性を確保
+      // 毎回新しいVertex AIインスタンスとモデルを作成してセッション独立性を確保
+      const vertexAI = createVertexAI();
       const freshGenerativeModel = vertexAI.preview.getGenerativeModel({
         model: 'gemini-2.5-flash-image-preview',
       });
