@@ -548,30 +548,6 @@ export default function Home() {
               <div className="space-y-3">
                 <button
                   onClick={() => {
-                    const currentUrl = window.location.href
-                    // スマートフォンの場合はChromeで開く
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-                    if (isMobile) {
-                      // Chrome で開くためのスキーム
-                      window.open(`googlechrome://${currentUrl}`, '_blank')
-                      // フォールバック用に通常のURLも開く
-                      setTimeout(() => {
-                        window.open(currentUrl, '_blank')
-                      }, 1000)
-                    } else {
-                      window.open(currentUrl, '_blank')
-                    }
-                  }}
-                  className="w-full text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                  style={{ backgroundColor: '#C792A3' }}
-                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#B8829'}
-                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#C792A3'}
-                >
-                  ブラウザで開く
-                </button>
-
-                <button
-                  onClick={() => {
                     // URLをクリップボードにコピー
                     navigator.clipboard.writeText(window.location.href).then(() => {
                       alert('URLをコピーしました！\nブラウザのアドレスバーに貼り付けてアクセスしてください。')
@@ -582,9 +558,8 @@ export default function Home() {
                   }}
                   className="w-full py-3 px-4 rounded-xl font-medium transition-colors"
                   style={{
-                    backgroundColor: '#D6C5D520',
-                    color: '#8B7086',
-                    borderColor: '#D6C5D560',
+                    backgroundColor: '#C792A3',
+                    color: 'white',
                     borderWidth: '1px'
                   }}
                 >
