@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function NavBar() {
+  const { user, signOut } = useAuth()
   const [dailyUsage, setDailyUsage] = useState({ count: 0, date: '' })
 
   // 日次使用制限の管理
@@ -39,6 +41,14 @@ export default function NavBar() {
     }
   }, [])
 
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('ログアウトエラー:', error)
+    }
+  }
+
   return (
     <header className="sticky top-0 z-10 bg-gradient-to-r from-pink-50/95 via-white/90 to-orange-50/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-b border-pink-100/50 shadow-sm">
       <nav className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between">
@@ -64,6 +74,15 @@ export default function NavBar() {
             使い方
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 group-hover:w-full transition-all duration-300"></span>
           </Link>
+          {user && (
+            <button
+              onClick={handleSignOut}
+              className="hover:text-brand-600 transition-colors duration-200 relative group"
+            >
+              ログアウト
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 group-hover:w-full transition-all duration-300"></span>
+            </button>
+          )}
         </div>
       </nav>
     </header>

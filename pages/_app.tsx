@@ -2,9 +2,11 @@ import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import '../styles/globals.css'
 import NavBar from '../components/NavBar'
+import { AuthProvider } from '../contexts/AuthContext'
+
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <>
+    <AuthProvider>
       <Head>
         <title>OKIBAE - おしゃれな置き画を、かんたんに</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
@@ -29,6 +31,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           <span>© {new Date().getFullYear()} OKIBAE</span>
         </footer>
       </div>
-    </>
+    </AuthProvider>
   )
 }

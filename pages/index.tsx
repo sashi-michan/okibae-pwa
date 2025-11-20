@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/router'
 import clsx from 'clsx'
+import { useAuth } from '../contexts/AuthContext'
 import StepCard from '../components/StepCard'
 
 type BgOption = 'white' | 'linen' | 'concrete' | 'wood' | 'white_wood'
@@ -14,9 +16,11 @@ type AppState = {
 }
 
 export default function Home() {
-  // デバッグモード（開発時は制限なし）
-  const DEBUG_MODE = process.env.NODE_ENV === 'development'
-  
+  // 認証チェック
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  // すべてのstateとrefをフックルールに従って最上部に配置
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
   const [bg, setBg] = useState<BgOption>('white')            // デフォルト背景を白に設定
@@ -31,6 +35,17 @@ export default function Home() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // デバッグモード（開発時は制限なし）
+  const DEBUG_MODE = process.env.NODE_ENV === 'development'
+
+  // 認証状態チェック
+  useEffect(() => {
+    // ログイン状態をチェック
+    if (!loading && !user) {
+      router.push('/login')
+    }
+  }, [user, loading, router])
 
   // LINE ブラウザ検出
   useEffect(() => {
@@ -180,6 +195,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appState.phase, imgUrl])
 
+  // ローディング中は何も表示しない
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
+        <div className="text-gray-600">読み込み中...</div>
+      </div>
+    )
+  }
+
+  // 未ログインならnullを返す（リダイレクト中）
+  if (!user) {
+    return null
+  }
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
