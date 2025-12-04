@@ -3,6 +3,7 @@ import Head from 'next/head'
 import '../styles/globals.css'
 import NavBar from '../components/NavBar'
 import { AuthProvider } from '../contexts/AuthContext'
+import { LineGuard } from '../components/LineGuard';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
@@ -31,6 +32,8 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           <span>© {new Date().getFullYear()} OKIBAE</span>
         </footer>
       </div>
+      <LineGuard />
     </AuthProvider>
   )
 }
+
