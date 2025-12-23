@@ -7,11 +7,20 @@ export default function Login() {
   const { user, loading, signInWithGoogle } = useAuth()
   const router = useRouter()
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     // すでにログイン済みならホームへリダイレクト
     if (!loading && user) {
       router.push('/')
+    }
+
+    // URLパラメータからエラーをチェック
+    const error = router.query.error
+    if (error === 'auth_failed') {
+      setErrorMessage('ログイン処理に失敗しました。もう一度お試しください。')
+    } else if (error === 'no_code') {
+      setErrorMessage('認証コードが見つかりませんでした。')
     }
   }, [user, loading, router])
 
@@ -39,7 +48,7 @@ export default function Login() {
       <Head>
         <title>ログイン - OKIBAE</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50 px-4">
+      <div className="min-h-screen flex items-start justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50 px-4 pt-20">
         <div className="max-w-md w-full">
           {/* カード */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-8 md:p-10">
@@ -61,6 +70,18 @@ export default function Login() {
                 ログインして始めましょう
               </p>
             </div>
+
+            {/* エラーメッセージ */}
+            {errorMessage && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-red-800">{errorMessage}</p>
+                </div>
+              </div>
+            )}
 
             {/* Googleログインボタン */}
             <button
