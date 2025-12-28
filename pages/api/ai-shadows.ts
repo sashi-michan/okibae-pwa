@@ -3,6 +3,7 @@ import { VertexAI } from '@google-cloud/vertexai'
 import formidable from 'formidable'
 import fs from 'fs'
 import path from 'path'
+import { createServerSupabaseClient } from '../../lib/supabase/server'
 
 type StyleKey = "white" | "linen" | "concrete" | "wood" | "white_wood";
 type WeatherKey = "sunny" | "cloudy" | "rainy";
@@ -221,10 +222,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    
+    // Supabaseクライアント作成
+    const supabase = createServerSupabaseClient(req, res)
+
+    // 認証チェック
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError)
+      return res.status(401).json({ ok: false, error: 'ログインが必要です' })
+    }
+
+    // クレジット残高チェック
+    const { data: creditsData, error: creditsError } = await supabase
+      .from('credits')
+      .select('balance')
+      .eq('user_id', user.id)
+      .single()
+
+    if (creditsError) {
+      console.error('Credits fetch error:', creditsError)
+      return res.status(500).json({ ok: false, error: 'クレジット情報の取得に失敗しました' })
+    }
+
+    if (!creditsData || creditsData.balance <= 0) {
+      console.log('Insufficient credits:', creditsData?.balance ?? 0)
+      return res.status(403).json({ ok: false, error: 'クレジットが不足しています' })
+    }
+
     // フォームデータ解析
     const { fields, files } = await parseForm(req)
-    
+
     // スタイルとファイル取得
     const style = String(Array.isArray(fields.style) ? fields.style[0] : fields.style || 'white').toLowerCase()
     const weather = String(Array.isArray(fields.weather) ? fields.weather[0] : fields.weather || 'sunny').toLowerCase()
@@ -233,12 +261,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const originalHeight = fields.originalHeight ? parseInt(String(Array.isArray(fields.originalHeight) ? fields.originalHeight[0] : fields.originalHeight)) : undefined
     const fileArray = Array.isArray(files.file) ? files.file : [files.file]
     const file = fileArray[0]
-    
+
     if (!file) {
       console.error('No file provided')
       return res.status(400).json({ ok: false, error: 'file is required' })
     }
-    
+
     if (!(style in REFERENCE_IMAGES)) {
       console.error(`Invalid style: ${style}`)
       return res.status(400).json({ ok: false, error: `invalid style: ${style}. Valid styles: ${Object.keys(REFERENCE_IMAGES).join(', ')}` })
@@ -352,8 +380,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ ok: false, error: 'no image data in response' })
     }
 
+    // クレジット消費処理（auth.uid()で自動的に実行者のクレジットを消費）
+    console.log('Attempting to consume credit...')
+    const { data: consumeData, error: updateError } = await supabase.rpc('consume_credit')
 
-    return res.json({ 
+    if (updateError) {
+      console.error('Credit consumption error:', updateError)
+      console.error('Error details:', JSON.stringify(updateError, null, 2))
+      // クレジット消費エラーでも画像は返す（ログのみ記録）
+      // 実際には再試行ロジックを追加することも検討
+    } else {
+      console.log('Credit consumption successful!', consumeData)
+    }
+
+    return res.json({
       ok: true,
       imageBase64: `data:${outMime};base64,${outB64}`,
       mimeType: outMime,

@@ -3,6 +3,8 @@ import { useRouter } from 'next/router'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
 import StepCard from '../components/StepCard'
+import { useDeviceType } from '../hooks/useDeviceType'
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 type BgOption = 'white' | 'linen' | 'concrete' | 'wood' | 'white_wood'
 type WeatherOption = 'sunny' | 'cloudy' | 'rainy'
@@ -17,8 +19,12 @@ type AppState = {
 
 export default function Home() {
   // 認証チェック
-  const { user, loading } = useAuth()
+  const { user, loading, refreshUserData } = useAuth()
   const router = useRouter()
+
+  // デバイス判定とPWAインストール状態
+  const { isIOS, isAndroid } = useDeviceType()
+  const { isInstalled, canPrompt, promptInstall } = usePWAInstall()
 
   // すべてのstateとrefをフックルールに従って最上部に配置
   const [file, setFile] = useState<File | null>(null)
@@ -135,15 +141,18 @@ export default function Home() {
             }
             const base64 = await toBase64Resized(img, 1536)
             const enhancedUrl = await generateStyledImage(base64, backgroundColor, weather, aspectRatio, originalSize)
-            
+
             // nano banana結果をstateに保存してFINAL_READYで描画
             setAppState({ phase: 'FINAL_READY', finalImageUrl: enhancedUrl })
-            
+
             // 使用回数をカウントアップ
             const newCount = dailyUsage.count + 1
             setDailyUsage(prev => ({ ...prev, count: newCount }))
             localStorage.setItem('okibae-count', newCount.toString())
-            
+
+            // クレジット残高を再取得してNavBarを更新
+            await refreshUserData()
+
             // ナビバー更新のためのイベント発火
             window.dispatchEvent(new Event('okibae-usage-update'))
           }
@@ -352,6 +361,17 @@ export default function Home() {
     }
   }
 
+  // PWAインストールバナーのハンドラー
+  const handleInstallClick = async () => {
+    if (isIOS) {
+      // iOSの場合は説明ページに遷移
+      router.push('/install-guide')
+    } else if (isAndroid && canPrompt) {
+      // Androidの場合はネイティブプロンプト表示
+      await promptInstall()
+    }
+  }
+
 
   return (
     <div className="main-container">
@@ -366,7 +386,32 @@ export default function Home() {
         </div>
         <p className="typography-subtitle mt-1 animate-slide-up text-center">おしゃれな置き画を、かんたんに</p>
       </div>
-      
+
+      {/* PWAインストールバナー */}
+      {!isInstalled && (isIOS || (isAndroid && canPrompt)) && (
+        <div className="max-w-2xl mx-auto px-8 mb-4">
+          <button
+            onClick={handleInstallClick}
+            className="w-full bg-gradient-to-r from-brand-400 to-brand-500 text-white rounded-2xl p-4 shadow-soft hover:shadow-lg transition-all duration-300 flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <div className="font-semibold">ホーム画面に追加</div>
+                <div className="text-sm text-white/80">アプリのように使えます</div>
+              </div>
+            </div>
+            <svg className="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto px-8 py-8">
         <div className="space-y-6">
           

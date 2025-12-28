@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git checkout:*)",
-      "Read(//d/msaka/Pictures/制作データ/アプリ/OKIBAE/参考/**)"
+      "Read(//d/msaka/Pictures/制作データ/アプリ/OKIBAE/参考/**)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []

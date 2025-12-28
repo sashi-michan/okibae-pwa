@@ -1,13 +1,26 @@
+import { useRouter } from 'next/router'
+
 export default function About() {
+  const router = useRouter()
+
   return (
     <div className="main-container">
       <div className="max-w-4xl mx-auto px-8 py-8">
-        <div className="mb-6 text-center">
+        <div className="mb-6">
+          <button
+            onClick={() => router.push('/')}
+            className="mb-4 text-brand-600 hover:text-brand-700 flex items-center gap-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            戻る
+          </button>
           <div className="flex items-center justify-center gap-3 animate-fade-in mb-2">
-            <img 
-              src="/okibae-icon.svg" 
-              alt="OKIBAE" 
-              className="h-8 w-8" 
+            <img
+              src="/okibae-icon.svg"
+              alt="OKIBAE"
+              className="h-8 w-8"
             />
             <h1 className="typography-main-title">OKIBAE</h1>
           </div>
