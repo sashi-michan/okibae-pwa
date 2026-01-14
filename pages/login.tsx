@@ -2,25 +2,36 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from '../contexts/AuthContext'
 import Head from 'next/head'
+import { LegalModal } from '../components/LegalModal'
+import { ErrorModal, ErrorType } from '../components/ErrorModal'
 
 export default function Login() {
   const { user, loading, signInWithGoogle } = useAuth()
   const router = useRouter()
   const [isSigningIn, setIsSigningIn] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [errorType, setErrorType] = useState<ErrorType | null>(null)
+  const [showTermsModal, setShowTermsModal] = useState(false)
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false)
 
   useEffect(() => {
-    // すでにログイン済みならホームへリダイレクト
     if (!loading && user) {
       router.push('/')
+      return
     }
 
-    // URLパラメータからエラーをチェック
+    // OAuth コールバックからのエラー
     const error = router.query.error
-    if (error === 'auth_failed') {
-      setErrorMessage('ログイン処理に失敗しました。もう一度お試しください。')
-    } else if (error === 'no_code') {
-      setErrorMessage('認証コードが見つかりませんでした。')
+    if (error === 'auth_failed') setErrorType('AUTH_OAUTH_FAILED')
+    else if (error === 'no_code') setErrorType('AUTH_NO_CODE')
+
+    // AuthContext からの認証エラー
+    const reason = router.query.reason
+    if (reason === 'restore_failed') {
+      setErrorType('AUTH_RESTORE_FAILED')
+    } else if (reason === 'fetch_failed') {
+      setErrorType('AUTH_FETCH_FAILED')
+    } else if (reason === 'signout_failed') {
+      setErrorType('AUTH_SIGNOUT_FAILED')
     }
   }, [user, loading, router])
 
@@ -30,93 +41,162 @@ export default function Login() {
       await signInWithGoogle()
     } catch (error) {
       console.error('ログインエラー:', error)
-      alert('ログインに失敗しました。もう一度お試しください。')
+      alert('ログインに失敗しました。')
       setIsSigningIn(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
-        <div className="text-gray-600">読み込み中...</div>
-      </div>
-    )
-  }
+  if (loading) return <div className="min-h-screen grid place-items-center bg-[#fdfcfb] text-gray-400 font-light tracking-widest">Loading...</div>
 
   return (
     <>
       <Head>
         <title>ログイン - OKIBAE</title>
       </Head>
-      <div className="min-h-screen flex items-start justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50 px-4 pt-20">
-        <div className="max-w-md w-full">
-          {/* カード */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-8 md:p-10">
-            {/* ロゴ・タイトル */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                OKIBAE
-              </h1>
-              <p className="text-sm text-gray-600">
-                おしゃれな置き画を、かんたんに
-              </p>
-            </div>
 
-            {/* 説明 */}
-            <div className="mb-8 text-center">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                手作り作家さん向けの商品撮影背景置き換えアプリ。
-                <br />
-                ログインして始めましょう
-              </p>
-            </div>
+      {/* 全体を包む背景 */}
+      <div className="w-full min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #fdfcfb 0%, #f7f4f1 50%, #fff5f0 100%)' }}>
 
-            {/* エラーメッセージ */}
-            {errorMessage && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-red-800">{errorMessage}</p>
+        {/* 【ガラスのカード】
+           py-12 md:py-20: 縦の余白をガッツリ増やしました！これで縦長でゆったりした印象になります。
+           max-w-4xl: 幅はコンパクトなまま維持
+        */}
+        <div className="w-full max-w-4xl bg-white/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/60 shadow-2xl shadow-[#b5a397]/10 flex flex-col md:flex-row items-center justify-center gap-10 md:gap-16 relative overflow-hidden py-12 px-8 md:py-20 md:px-12 z-10 mx-auto">
+            
+            {/* ガラスボード内の光沢エフェクト */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/50 via-transparent to-transparent pointer-events-none"></div>
+
+            {/* 左側：ビジュアル 
+               h-72 md:h-[400px]: 画像エリアの高さを大幅にアップ！
+               これでBeforeとAfterが上下に離れて、重なりが減ります。
+            */}
+            <div className="flex-1 w-full flex flex-col items-center md:items-end justify-center relative z-20">
+               <div className="relative w-64 h-72 md:w-[360px] md:h-[400px]">
+                  {/* Before画像（上側） */}
+                  <div className="absolute top-0 right-0 md:right-0 w-40 h-48 md:w-56 md:h-64 bg-white/40 backdrop-blur-md p-2.5 rounded-2xl transform rotate-6 border border-white/50 shadow-lg float-element float-delay-1">
+                    <div className="w-full h-full rounded-xl overflow-hidden relative">
+                      <img
+                        src="/samples/before.jpg"
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] md:text-xs text-gray-600 font-medium tracking-wider shadow-sm border border-white/50">
+                        Before
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* After画像（下側）
+                     bottom-0: エリアの一番下に配置。エリアが縦長になった分、Beforeから離れます。
+                  */}
+                  <div className="absolute bottom-0 left-0 md:left-2 w-44 h-56 md:w-56 md:h-72 bg-[#fcf9f7] p-2.5 rounded-2xl transform -rotate-3 z-20 shadow-2xl shadow-neutral-400/20 border border-white float-element float-delay-2">
+                    <div className="w-full h-full rounded-xl overflow-hidden relative bg-gray-50">
+                      <img
+                        src="/samples/after.jpg"
+                        alt="Sample"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] md:text-xs text-gray-600 font-medium tracking-wider shadow-sm border border-white/50">
+                        After
+                      </div>
+                    </div>
+                  </div>
                 </div>
+            </div>
+
+            {/* 右側：フォーム */}
+            <div className="flex-1 w-full flex flex-col items-center md:items-start justify-center relative z-20">
+              <div className="text-center md:text-left mb-8 md:mb-10">
+                <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                  <img
+                    src="/okibae-icon.svg"
+                    alt="OKIBAE"
+                    className="h-10 w-10 md:h-12 md:w-12"
+                  />
+                  <h1 className="text-3xl md:text-5xl font-thin tracking-[0.15em] font-sans" style={{ color: '#666' }}>
+                    OKIBAE
+                  </h1>
+                </div>
+                <p className="text-sm text-gray-600 font-light leading-loose tracking-wider">
+                  おしゃれな置き画が簡単に作れるアプリ。<br />
+                  あなたの商品写真を、もっと<span className="text-gray-800 font-normal border-b border-[#d4c4b7] pb-1">素敵</span>に。
+                </p>
               </div>
-            )}
 
-            {/* Googleログインボタン */}
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={isSigningIn}
-              className="w-full bg-white hover:bg-gray-50 text-gray-800 font-medium py-3 px-6 rounded-xl border-2 border-gray-200 transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              {isSigningIn ? 'ログイン中...' : 'Googleでログイン'}
-            </button>
 
-            {/* 注意書き */}
-            <p className="text-xs text-gray-500 text-center mt-6">
-              ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます
-            </p>
-          </div>
+              <div className="space-y-6">
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn}
+                  className="w-full md:w-auto min-w-[240px] bg-white hover:bg-[#fafaf9] text-gray-600 font-medium py-3.5 px-8 rounded-full transition-all duration-500 flex items-center justify-center gap-4 shadow-xl shadow-[#b5a397]/10 hover:shadow-2xl hover:shadow-[#b5a397]/20 hover:-translate-y-1 group relative overflow-hidden tracking-wider border border-white/60 text-sm md:text-base"
+                >
+                  <img src="https://www.google.com/favicon.ico" alt="G" className="w-4 h-4 md:w-5 md:h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  <span className="relative z-10">{isSigningIn ? '接続中...' : 'Googleではじめる'}</span>
+                </button>
+              </div>
+
+              <div className="mt-10 text-center md:text-left">
+                <p className="text-[10px] text-gray-500/60 font-light tracking-wide">
+                  続行することで、
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setShowTermsModal(true)
+                    }}
+                    className="underline decoration-gray-300 hover:text-gray-600 transition-colors mx-1 cursor-pointer"
+                  >
+                    利用規約
+                  </a>
+                  ・
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setShowPrivacyModal(true)
+                    }}
+                    className="underline decoration-gray-300 hover:text-gray-600 transition-colors mx-1 cursor-pointer"
+                  >
+                    プライバシーポリシー
+                  </a>
+                  <br className="md:hidden"/>
+                  に同意したものとみなされます。
+                </p>
+              </div>
+            </div>
+
         </div>
+
+        {/* フッター（著作権表記） */}
+        <footer className="text-center text-xs text-gray-500 py-6 relative z-20">
+          <span>© {new Date().getFullYear()} OKIBAE</span>
+        </footer>
       </div>
+
+      {/* モーダル */}
+      <LegalModal
+        isOpen={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        type="terms"
+      />
+      <LegalModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        type="privacy"
+      />
+
+      {/* エラーモーダル */}
+      {errorType && (
+        <ErrorModal
+          isOpen={true}
+          onClose={() => {
+            setErrorType(null)
+            // クエリパラメータをクリア
+            router.replace('/login', undefined, { shallow: true })
+          }}
+          errorType={errorType}
+        />
+      )}
     </>
   )
 }
