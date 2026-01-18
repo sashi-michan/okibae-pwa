@@ -1,11 +1,16 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import NavBar from '../components/NavBar'
 import { AuthProvider } from '../contexts/AuthContext'
 import { LineGuard } from '../components/LineGuard';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter()
+  // ログインページは独自レイアウトを使用
+  const isLoginPage = router.pathname === '/login'
+
   return (
     <AuthProvider>
       <Head>
@@ -23,16 +28,25 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <meta name="application-name" content="OKIBAE" />
         <meta name="description" content="手作り作家さん向けの商品撮影背景置き換えアプリ。AIで美しい置き画を簡単に作成" />
       </Head>
-      <div className="min-h-full flex flex-col">
-        <NavBar />
-        <main className="flex-1 mx-auto w-full max-w-3xl px-4 py-6 md:py-10">
+      {isLoginPage ? (
+        // ログインページは独自レイアウト（NavBar、フッター、パディングなし）
+        <>
           <Component {...pageProps} />
-        </main>
-        <footer className="text-center text-xs text-gray-500 py-6">
-          <span>© {new Date().getFullYear()} OKIBAE</span>
-        </footer>
-      </div>
-      <LineGuard />
+          <LineGuard />
+        </>
+      ) : (
+        // 通常ページはNavBarとフッターあり
+        <div className="min-h-full flex flex-col">
+          <NavBar />
+          <main className="flex-1 mx-auto w-full max-w-3xl px-4 py-6 md:py-10">
+            <Component {...pageProps} />
+          </main>
+          <footer className="text-center text-xs text-gray-500 py-6">
+            <span>© {new Date().getFullYear()} OKIBAE</span>
+          </footer>
+          <LineGuard />
+        </div>
+      )}
     </AuthProvider>
   )
 }

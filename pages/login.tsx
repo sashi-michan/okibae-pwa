@@ -37,16 +37,47 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[login] ログインボタン押した')
+      }
       setIsSigningIn(true)
+
+      // 5秒後に保険でisSigningInをfalseに戻す（リダイレクト失敗時の保険）
+      const timeoutId = setTimeout(() => {
+        setIsSigningIn(false)
+      }, 5000)
+
       await signInWithGoogle()
-    } catch (error) {
-      console.error('ログインエラー:', error)
-      alert('ログインに失敗しました。')
+      // OAuth リダイレクトが開始されるため、通常ここには到達しない
+      clearTimeout(timeoutId)
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[login] ログイン失敗:', error?.message || String(error))
+      }
+      setErrorType('AUTH_OAUTH_FAILED')
       setIsSigningIn(false)
     }
   }
 
-  if (loading) return <div className="min-h-screen grid place-items-center bg-[#fdfcfb] text-gray-400 font-light tracking-widest">Loading...</div>
+  const handleRetry = () => {
+    setErrorType(null)
+    setIsSigningIn(false)
+  }
+
+  const handleReload = () => {
+    window.location.reload()
+  }
+
+  if (loading || isSigningIn) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-[#fdfcfb]">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-gray-400 font-light tracking-widest">ログイン中...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -195,6 +226,8 @@ export default function Login() {
             router.replace('/login', undefined, { shallow: true })
           }}
           errorType={errorType}
+          onRetry={handleRetry}
+          onReload={handleReload}
         />
       )}
     </>

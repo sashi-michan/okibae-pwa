@@ -7,10 +7,19 @@ export const LineGuard = () => {
   useEffect(() => {
     // 1. ユーザーエージェント（ブラウザの正体）を取得
     const ua = navigator.userAgent.toLowerCase();
-    
+
+    // テスト用：URLパラメータで強制表示
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('line-test') === 'true') {
+      console.log('LINE Browser test mode enabled!');
+      setIsTrapped(true);
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
     // 2. LINEまたはInstagramなどのアプリ内ブラウザか判定
     const isInAppBrowser = ua.includes('line') || ua.includes('instagram') || ua.includes('facebook');
-    
+
     // 3. OSを判定（iPhoneかAndroidかでお母さんへの案内を変えるため）
     if (ua.includes('iphone') || ua.includes('ipad')) {
       setOsType('ios');
@@ -34,18 +43,9 @@ export const LineGuard = () => {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-pink-50 via-orange-50 to-orange-100 p-6 text-center">
 
       {/* 注意喚起タイトル */}
-      <h2 className="text-xl font-bold mb-6" style={{ color: '#C2A2A8' }}>
+      <h2 className="text-xl font-bold mb-8" style={{ color: '#C2A2A8' }}>
         ブラウザを変更してください
       </h2>
-
-      {/* ここにGIFを入れるエリア */}
-      <div className="w-64 h-64 bg-white/80 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border-2 border-dashed shadow-sm" style={{ borderColor: '#C2A2A8' }}>
-        <p className="text-sm" style={{ color: '#C2A2A8' }}>
-          ここに<br/>
-          {osType === 'ios' ? 'iPhone用' : 'Android用'}の<br/>
-          GIFアニメを入れる
-        </p>
-      </div>
 
       {/* 操作説明テキスト */}
       <div className="space-y-4 max-w-sm">
@@ -62,14 +62,14 @@ export const LineGuard = () => {
             {osType === 'ios' ? (
               // iPhone向けの説明
               <>
-                1. 共有ボタン <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">↑</span> をタップ<br/>
-                2. <b>「Safariで開く」</b>を選択
+                1. 右下のメニュー <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">︙</span> をタップ<br/>
+                2. <b>「ブラウザで開く」</b>を選択
               </>
             ) : (
               // Android向けの説明
               <>
-                1. 右上のメニュー <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">︙</span> をタップ<br/>
-                2. <b>「ブラウザで開く」</b>を選択
+                1. 右下のメニュー <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">︙</span> をタップ<br/>
+                2. <b>「デフォルトのブラウザで開く」</b>を選択
               </>
             )}
           </p>

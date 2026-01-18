@@ -10,6 +10,7 @@ type AuthContextType = {
   session: Session | null
   userData: UserData | null
   loading: boolean
+  errorReason: 'fetch_failed' | null
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   refreshUserData: () => Promise<void>
@@ -21,17 +22,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const didInitRef = useRef(false)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [errorReason, setErrorReason] = useState<'fetch_failed' | null>(null)
   const authFailureHandledRef = useRef(false)
   const router = useRouter()
 
-  // 初期化完了ヘルパー（最初の1回だけ loading を解除）
-  const finishInit = () => {
-    if (!didInitRef.current) {
-      didInitRef.current = true
-      setLoading(false)
-    }
+  // 初期化完了ヘルパー（auth確認完了）
+  const finishAuthInit = () => {
+    setAuthLoading(false)
   }
 
   // 認証エラー時の共通処理（一元化 & 二重発火防止）
@@ -61,21 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // リトライヘルパー（3回リトライ、各2秒待機）
-  const retryWithDelay = async <T,>(
+  // リトライヘルパー（バックオフ: 300ms → 1000ms → 2000ms）
+  const retryWithBackoff = async <T,>(
     fn: () => Promise<T>,
-    retries: number = 3,
-    delay: number = 2000
+    delays: number[] = [300, 1000, 2000]
   ): Promise<T | null> => {
-    for (let i = 0; i < retries; i++) {
+    for (let i = 0; i < delays.length; i++) {
       try {
         return await fn()
       } catch (error) {
-        logger.warn(`Retry attempt ${i + 1}/${retries} failed:`, error)
-        if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, delay))
+        if (i < delays.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, delays[i]))
         } else {
-          logger.error(`Failed after ${retries} retries:`, error)
           return null
         }
       }
@@ -91,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ユーザーデータ取得関数（復活処理の再帰は1回まで）
   const fetchUserData = async (userId: string, didRestore = false): Promise<FetchResult> => {
     // Step 1: データ取得（リトライあり）
-    const result = await retryWithDelay(async () => {
+    const result = await retryWithBackoff(async () => {
       const [profileRes, subscriptionRes, creditsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('subscriptions').select('*').eq('user_id', userId).single(),
@@ -127,8 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, reason: 'restore_failed' as const }
       }
 
-      logger.info('退会済みアカウントを検出しました。復活処理を実行します。', { userId })
-      const restoreResult = await retryWithDelay(async () => {
+      logger.dev('退会済みアカウントを検出しました。復活処理を実行します。', { userId })
+      const restoreResult = await retryWithBackoff(async () => {
         const restoreResponse = await fetch('/api/account/restore', {
           method: 'POST',
           headers: {
@@ -158,21 +154,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 初回セッション取得
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try {
-        setSession(session)
-        setUser(session?.user ?? null)
+      logger.dev('[AuthContext] getSession:', { hasSession: !!session, userId: session?.user?.id })
+      setSession(session)
+      setUser(session?.user ?? null)
+      finishAuthInit()
 
-        if (session?.user) {
-          const result = await fetchUserData(session.user.id)
-          if (result.success) {
-            setUserData(result.data)
-          } else {
-            // エラー発生時は handleAuthFailure で一元処理
+      if (session?.user) {
+        setDataLoading(true)
+        logger.dev('[AuthContext] userData fetch: start')
+        const result = await fetchUserData(session.user.id)
+        if (result.success) {
+          logger.dev('[AuthContext] userData fetch: ok')
+          setUserData(result.data)
+          setErrorReason(null)
+        } else {
+          logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
+          if (result.reason === 'restore_failed') {
             await handleAuthFailure(result.reason)
+          } else {
+            setErrorReason('fetch_failed')
           }
         }
-      } finally {
-        finishInit()
+        setDataLoading(false)
       }
     })
 
@@ -180,28 +183,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        // ログイン成功時に authFailureHandledRef をリセット
-        if (event === 'SIGNED_IN') {
-          authFailureHandledRef.current = false
-        }
+      logger.dev('[AuthContext] onAuthStateChange:', { event, hasSession: !!session })
 
-        setSession(session)
-        setUser(session?.user ?? null)
+      // ログイン成功時に authFailureHandledRef をリセット
+      if (event === 'SIGNED_IN') {
+        authFailureHandledRef.current = false
+      }
 
-        if (session?.user) {
-          const result = await fetchUserData(session.user.id)
-          if (result.success) {
-            setUserData(result.data)
-          } else {
-            // エラー発生時は handleAuthFailure で一元処理
-            await handleAuthFailure(result.reason)
-          }
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        setDataLoading(true)
+        logger.dev('[AuthContext] userData fetch: start')
+        const result = await fetchUserData(session.user.id)
+        if (result.success) {
+          logger.dev('[AuthContext] userData fetch: ok')
+          setUserData(result.data)
+          setErrorReason(null)
         } else {
-          setUserData(null)
+          logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
+          if (result.reason === 'restore_failed') {
+            // restore失敗は本当に壊れてるので即signOut
+            await handleAuthFailure(result.reason)
+          } else {
+            // fetch_failed は一時的な可能性があるのでエラー状態保持のみ
+            setErrorReason('fetch_failed')
+          }
         }
-      } finally {
-        finishInit()
+        setDataLoading(false)
+      } else {
+        setUserData(null)
       }
     })
 
@@ -224,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null)
     setUserData(null)
 
-    const result = await retryWithDelay(async () => {
+    const result = await retryWithBackoff(async () => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       return true
@@ -239,13 +251,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserData = async () => {
     if (user) {
+      setDataLoading(true)
       const result = await fetchUserData(user.id)
       if (result.success) {
         setUserData(result.data)
+        setErrorReason(null)
       } else {
-        // エラー発生時は handleAuthFailure で一元処理
-        await handleAuthFailure(result.reason)
+        if (result.reason === 'restore_failed') {
+          await handleAuthFailure(result.reason)
+        } else {
+          setErrorReason('fetch_failed')
+        }
       }
+      setDataLoading(false)
     }
   }
 
@@ -255,7 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         userData,
-        loading,
+        loading: authLoading || dataLoading,
+        errorReason,
         signInWithGoogle,
         signOut,
         refreshUserData,

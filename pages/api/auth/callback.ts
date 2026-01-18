@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { serialize } from 'cookie'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
+const isDev = process.env.NODE_ENV === 'development'
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store')
 
@@ -11,7 +13,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const rawNext = typeof req.query.next === 'string' ? req.query.next : '/'
   const next = rawNext.startsWith('/') ? rawNext : '/'
 
-  if (!code) return res.redirect('/login?error=no_code')
+  if (!code) {
+    if (isDev) console.log('[callback] code: なし')
+    return res.redirect('/login?error=no_code')
+  }
+
+  if (isDev) console.log('[callback] code: あり')
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,9 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    console.error('exchangeCodeForSession error:', error.message)
+    if (isDev) console.log('[callback] exchange: 失敗', error.name || error.message)
     return res.redirect('/login?error=auth_failed')
   }
 
+  if (isDev) console.log('[callback] exchange: OK')
   return res.redirect(next)
 }

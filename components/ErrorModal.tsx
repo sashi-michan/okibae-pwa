@@ -20,6 +20,8 @@ export interface ErrorModalProps {
   requestId?: string
   creditConsumed?: boolean // true: 消費済み, false: 未消費, undefined: 不明
   customMessage?: string
+  onRetry?: () => void // リトライボタン（認証エラー時など）
+  onReload?: () => void // 再読み込みボタン（認証エラー時など）
 }
 
 const SUPPORT_EMAIL = 'okibae.help@gmail.com'
@@ -30,7 +32,9 @@ export function ErrorModal({
   errorType,
   requestId,
   creditConsumed,
-  customMessage
+  customMessage,
+  onRetry,
+  onReload
 }: ErrorModalProps) {
   const router = useRouter()
 
@@ -101,7 +105,8 @@ export function ErrorModal({
           message: 'アカウントの復活処理に失敗しました。時間を置いて再度ログインしてみてください。',
           showRequestId: false,
           showSupport: true,
-          primaryButton: null
+          primaryButton: null,
+          showRetryButtons: true
         }
 
       case 'AUTH_FETCH_FAILED':
@@ -110,7 +115,8 @@ export function ErrorModal({
           message: 'ユーザー情報の取得に失敗しました。時間を置いて再度ログインしてみてください。',
           showRequestId: false,
           showSupport: true,
-          primaryButton: null
+          primaryButton: null,
+          showRetryButtons: true
         }
 
       case 'AUTH_SIGNOUT_FAILED':
@@ -119,7 +125,8 @@ export function ErrorModal({
           message: 'ログアウトに失敗しました。時間を置いて再度ログインしてみてください。',
           showRequestId: false,
           showSupport: true,
-          primaryButton: null
+          primaryButton: null,
+          showRetryButtons: true
         }
 
       case 'AUTH_OAUTH_FAILED':
@@ -128,7 +135,8 @@ export function ErrorModal({
           message: 'ログイン処理に失敗しました。時間を置いて再度お試しください。',
           showRequestId: false,
           showSupport: true,
-          primaryButton: null
+          primaryButton: null,
+          showRetryButtons: true
         }
 
       case 'AUTH_NO_CODE':
@@ -137,7 +145,8 @@ export function ErrorModal({
           message: '認証コードが見つかりませんでした。もう一度お試しください。',
           showRequestId: false,
           showSupport: true,
-          primaryButton: null
+          primaryButton: null,
+          showRetryButtons: true
         }
 
       case 'SERVER_ERROR':
@@ -245,6 +254,31 @@ export function ErrorModal({
           >
             {content.primaryButton.label}
           </button>
+        )}
+
+        {/* リトライボタン（認証エラー時） */}
+        {content.showRetryButtons && (
+          <div className="flex flex-col gap-3">
+            {onRetry && (
+              <button
+                onClick={() => {
+                  onClose()
+                  onRetry()
+                }}
+                className="w-full bg-[#C792A3] hover:bg-[#C2A2A8] text-white font-medium py-3 px-6 rounded-full transition-all duration-300 text-sm"
+              >
+                もう一度ログイン
+              </button>
+            )}
+            {onReload && (
+              <button
+                onClick={onReload}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-full transition-all duration-300 text-sm"
+              >
+                再読み込み
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
