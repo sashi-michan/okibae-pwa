@@ -86,11 +86,12 @@ export default function Home() {
     if (!router.isReady) return
     if (bypassAuthRedirect) return
 
-    // ログイン状態をチェック（初回認証チェックのみ）
-    if (!authLoading && !user) {
+    // ログイン状態をチェック（authLoading=認証確認中、loading=データ取得中）
+    // 両方が完了してからユーザーがいなければログインページへ
+    if (!authLoading && !loading && !user) {
       router.push('/login')
     }
-  }, [router.isReady, bypassAuthRedirect, user, authLoading, router])
+  }, [router.isReady, bypassAuthRedirect, user, authLoading, loading, router])
 
   // LINE ブラウザ検出は LineGuard コンポーネントで対応済み
 
@@ -242,8 +243,8 @@ export default function Home() {
     img.src = appState.finalImageUrl
   }, [appState.finalImageUrl])
 
-  // 初回認証チェック中は何も表示しない
-  if (authLoading) {
+  // 初回認証チェック中、またはデータ読み込み中は何も表示しない
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
         <div className="text-gray-600">読み込み中...</div>
