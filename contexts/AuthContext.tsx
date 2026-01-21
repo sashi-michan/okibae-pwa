@@ -153,8 +153,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // 初回セッション取得
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // 全体タイムアウト（10秒）
+    const overallTimeout = setTimeout(() => {
+      logger.error('[AuthContext] 全体タイムアウト（10秒超過）')
+      handleAuthFailure('fetch_failed')
+    }, 10000)
+
+    // 初回セッション取得（3秒タイムアウト）
+    const getSessionPromise = Promise.race([
+      supabase.auth.getSession(),
+      new Promise<{ data: { session: null } }>((resolve) =>
+        setTimeout(() => {
+          logger.error('[AuthContext] getSession タイムアウト（3秒）')
+          resolve({ data: { session: null } })
+        }, 3000)
+      ),
+    ])
+
+    getSessionPromise.then(async ({ data: { session } }) => {
       logger.dev('[AuthContext] getSession:', { hasSession: !!session, userId: session?.user?.id })
       setSession(session)
       setUser(session?.user ?? null)
@@ -163,21 +179,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         setDataLoading(true)
         logger.dev('[AuthContext] userData fetch: start')
-        const result = await fetchUserData(session.user.id)
+
+        // fetchUserData に5秒タイムアウトを設定
+        const fetchPromise = Promise.race([
+          fetchUserData(session.user.id),
+          new Promise<FetchResult>((resolve) =>
+            setTimeout(() => {
+              logger.error('[AuthContext] userData fetch タイムアウト（5秒）')
+              resolve({ success: false, reason: 'fetch_failed' })
+            }, 5000)
+          ),
+        ])
+
+        const result = await fetchPromise
         if (result.success) {
           logger.dev('[AuthContext] userData fetch: ok')
           setUserData(result.data)
           setErrorReason(null)
+          clearTimeout(overallTimeout) // 成功したらタイムアウト解除
         } else {
           logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
+          clearTimeout(overallTimeout) // 失敗確定したのでタイムアウト解除
           if (result.reason === 'restore_failed') {
             await handleAuthFailure(result.reason)
           } else {
-            setErrorReason('fetch_failed')
+            // fetch_failed の場合はログインページにリダイレクト
+            await handleAuthFailure('fetch_failed')
           }
         }
         setDataLoading(false)
+      } else {
+        clearTimeout(overallTimeout) // セッションなしなのでタイムアウト解除
       }
+    }).catch((error) => {
+      logger.error('[AuthContext] getSession error:', error)
+      clearTimeout(overallTimeout)
+      handleAuthFailure('fetch_failed')
     })
 
     // 認証状態の変更を監視
@@ -196,21 +233,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         setDataLoading(true)
-        logger.dev('[AuthContext] userData fetch: start')
-        const result = await fetchUserData(session.user.id)
+        logger.dev('[AuthContext] userData fetch: start (onAuthStateChange)')
+
+        // fetchUserData に5秒タイムアウトを設定
+        const fetchPromise = Promise.race([
+          fetchUserData(session.user.id),
+          new Promise<FetchResult>((resolve) =>
+            setTimeout(() => {
+              logger.error('[AuthContext] userData fetch タイムアウト（5秒） in onAuthStateChange')
+              resolve({ success: false, reason: 'fetch_failed' })
+            }, 5000)
+          ),
+        ])
+
+        const result = await fetchPromise
         if (result.success) {
           logger.dev('[AuthContext] userData fetch: ok')
           setUserData(result.data)
           setErrorReason(null)
         } else {
           logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
-          if (result.reason === 'restore_failed') {
-            // restore失敗は本当に壊れてるので即signOut
-            await handleAuthFailure(result.reason)
-          } else {
-            // fetch_failed は一時的な可能性があるのでエラー状態保持のみ
-            setErrorReason('fetch_failed')
-          }
+          // いずれの失敗もログインページへリダイレクト
+          await handleAuthFailure(result.reason)
         }
         setDataLoading(false)
       } else {
