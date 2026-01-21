@@ -32,7 +32,7 @@ type AppState = {
 
 export default function Home() {
   // 認証チェック
-  const { user, loading, errorReason, refreshUserData } = useAuth()
+  const { user, loading, authLoading, errorReason, refreshUserData } = useAuth()
   const router = useRouter()
 
   // デバイス判定とPWAインストール状態
@@ -71,13 +71,26 @@ export default function Home() {
   // デバッグモード（開発時は制限なし）
   const DEBUG_MODE = process.env.NODE_ENV === 'development'
 
+  // デバッグ用クエリパラメータ取得
+  const debugStatus = router.query.debugStatus as string | undefined
+  const debugDelay = router.query.debugDelay ? parseInt(router.query.debugDelay as string) : undefined
+  const debugOkButNoImage = router.query.debugOkButNoImage === '1'
+
+  // ★追加：デバッグ時だけ認証ガードを止める
+  const bypassAuthRedirect = process.env.NODE_ENV === 'development' && (
+    !!debugStatus || !!debugDelay || debugOkButNoImage
+  )
+
   // 認証状態チェック
   useEffect(() => {
-    // ログイン状態をチェック
-    if (!loading && !user) {
+    if (!router.isReady) return
+    if (bypassAuthRedirect) return
+
+    // ログイン状態をチェック（初回認証チェックのみ）
+    if (!authLoading && !user) {
       router.push('/login')
     }
-  }, [user, loading, router])
+  }, [router.isReady, bypassAuthRedirect, user, authLoading, router])
 
   // LINE ブラウザ検出は LineGuard コンポーネントで対応済み
 
@@ -164,7 +177,11 @@ export default function Home() {
         return
       }
       const base64 = await toBase64Resized(img, 1536)
-      const result = await generateStyledImage(base64, backgroundColor, reqWeather, reqAspectRatio, reqOriginalSize)
+      const result = await generateStyledImage(base64, backgroundColor, reqWeather, reqAspectRatio, reqOriginalSize, {
+        debugStatus,
+        debugDelay,
+        debugOkButNoImage
+      })
 
       // キャンセルチェック（非同期処理後）
       if (cancelled) return
@@ -225,8 +242,8 @@ export default function Home() {
     img.src = appState.finalImageUrl
   }, [appState.finalImageUrl])
 
-  // ローディング中は何も表示しない
-  if (loading) {
+  // 初回認証チェック中は何も表示しない
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
         <div className="text-gray-600">読み込み中...</div>
@@ -234,8 +251,8 @@ export default function Home() {
     )
   }
 
-  // 未ログインならnullを返す（リダイレクト中）
-  if (!user) {
+  // 未ログインならnullを返す（ただしデバッグ時は表示してOK）
+  if (!user && !bypassAuthRedirect) {
     return null
   }
 
@@ -563,7 +580,22 @@ export default function Home() {
               ) : (
                 <div className="relative">
                   <canvas
-                    ref={canvasRef}
+                    ref={(el) => {
+                      canvasRef.current = el
+                      // Canvas要素がマウントされたら即座に描画
+                      if (el && appState.finalImageUrl) {
+                        const img = new Image()
+                        img.onload = () => {
+                          el.width = img.width
+                          el.height = img.height
+                          const ctx = el.getContext('2d')
+                          if (ctx) {
+                            ctx.drawImage(img, 0, 0)
+                          }
+                        }
+                        img.src = appState.finalImageUrl
+                      }
+                    }}
                     className="max-w-full border rounded-xl"
                   />
                   <div className="text-sm text-green-600 mt-2 text-right">✓ 生成完了</div>
@@ -947,7 +979,18 @@ async function toBase64Resized(imgEl: HTMLImageElement, maxSide=1536){
 
 
 // AI-powered styled image generation using nano banana (Gemini 2.5 Flash Image Preview)
-async function generateStyledImage(cutoutBase64: string, backgroundColor: string, weather: WeatherOption, aspectRatio: AspectRatioOption, originalSize: {width: number, height: number} | null): Promise<{
+async function generateStyledImage(
+  cutoutBase64: string,
+  backgroundColor: string,
+  weather: WeatherOption,
+  aspectRatio: AspectRatioOption,
+  originalSize: {width: number, height: number} | null,
+  debugOptions?: {
+    debugStatus?: string
+    debugDelay?: number
+    debugOkButNoImage?: boolean
+  }
+): Promise<{
   success: boolean
   imageBase64?: string
   error?: {
@@ -992,10 +1035,22 @@ async function generateStyledImage(cutoutBase64: string, backgroundColor: string
       formData.append('originalHeight', originalSize.height.toString())
     }
 
+    // デバッグパラメータを追加
+    if (debugOptions?.debugStatus) {
+      formData.append('debugStatus', debugOptions.debugStatus)
+    }
+    if (debugOptions?.debugDelay) {
+      formData.append('debugDelay', debugOptions.debugDelay.toString())
+    }
+    if (debugOptions?.debugOkButNoImage) {
+      formData.append('debugOkButNoImage', '1')
+    }
 
     // Call our AI styled image API with timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2分タイムアウト
+    // デバッグ用の遅延がある場合はタイムアウトを延長
+    const timeoutMs = debugOptions?.debugDelay ? Math.max(debugOptions.debugDelay + 10000, 120000) : 120000
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     const response = await fetch('/api/ai-shadows', {
       method: 'POST',

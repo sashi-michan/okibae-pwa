@@ -1,12 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 
 export default function PurchasePage() {
-  const { user, userData } = useAuth()
+  const { user, userData, authLoading } = useAuth()
   const router = useRouter()
   const [isPurchasing, setIsPurchasing] = useState(false)
+
+  // 認証チェック（useEffect内で実行）
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [authLoading, user, router])
 
   const handlePurchase = async () => {
     setIsPurchasing(true)
@@ -43,9 +50,13 @@ export default function PurchasePage() {
     }
   }
 
-  if (!user) {
-    router.push('/login')
-    return null
+  // 認証チェック中またはログアウト状態の場合は何も表示しない
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
+        <div className="text-gray-600">読み込み中...</div>
+      </div>
+    )
   }
 
   const balance = userData?.credits.balance ?? 0

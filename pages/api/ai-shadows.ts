@@ -222,6 +222,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // フォームデータ解析（デバッグパラメータ取得のため最初に実行）
+    const { fields, files } = await parseForm(req)
+
+    // デバッグパラメータ取得
+    const debugStatus = fields.debugStatus ? String(Array.isArray(fields.debugStatus) ? fields.debugStatus[0] : fields.debugStatus) : undefined
+    const debugDelay = fields.debugDelay ? parseInt(String(Array.isArray(fields.debugDelay) ? fields.debugDelay[0] : fields.debugDelay)) : undefined
+    const debugOkButNoImage = fields.debugOkButNoImage
+      ? String(Array.isArray(fields.debugOkButNoImage) ? fields.debugOkButNoImage[0] : fields.debugOkButNoImage) === '1'
+      : false
+
+    // デバッグモード処理（開発環境のみ、認証チェックより前に実行）
+    if (process.env.NODE_ENV === 'development') {
+      // デバッグ遅延
+      if (debugDelay) {
+        console.log(`[DEBUG] Delaying response by ${debugDelay}ms`)
+        await new Promise(resolve => setTimeout(resolve, debugDelay))
+      }
+
+      // デバッグステータスコード
+      if (debugStatus) {
+        const statusCode = parseInt(debugStatus)
+        console.log(`[DEBUG] Returning status ${statusCode}`)
+
+        const errorMessages: Record<number, string> = {
+          401: 'ログインが必要です',
+          403: 'クレジットが不足しています',
+          400: '入力データが不正です',
+          500: 'サーバーエラーが発生しました',
+          504: 'タイムアウトしました'
+        }
+
+        return res.status(statusCode).json({
+          ok: false,
+          error: errorMessages[statusCode] || 'Unknown error',
+          requestId: `debug-${Date.now()}`,
+          creditConsumed: false  // テスト用なので常にfalse
+        })
+      }
+
+      // デバッグOKだけど画像なし
+      if (debugOkButNoImage) {
+        console.log('[DEBUG] Returning OK but no image')
+        return res.status(200).json({
+          ok: false,
+          error: '画像生成に失敗しました',
+          requestId: `debug-${Date.now()}`,
+          creditConsumed: false  // テスト用なので常にfalse
+        })
+      }
+    }
+
     // Supabaseクライアント作成
     const supabase = createServerSupabaseClient(req, res)
 
@@ -249,9 +300,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Insufficient credits:', creditsData?.balance ?? 0)
       return res.status(403).json({ ok: false, error: 'クレジットが不足しています' })
     }
-
-    // フォームデータ解析
-    const { fields, files } = await parseForm(req)
 
     // スタイルとファイル取得
     const style = String(Array.isArray(fields.style) ? fields.style[0] : fields.style || 'white').toLowerCase()

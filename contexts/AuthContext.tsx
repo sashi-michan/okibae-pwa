@@ -10,6 +10,7 @@ type AuthContextType = {
   session: Session | null
   userData: UserData | null
   loading: boolean
+  authLoading: boolean
   errorReason: 'fetch_failed' | null
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -274,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         userData,
         loading: authLoading || dataLoading,
+        authLoading,
         errorReason,
         signInWithGoogle,
         signOut,

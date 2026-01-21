@@ -61,7 +61,7 @@ export function ErrorModal({
           showRequestId: false,
           showSupport: false,
           primaryButton: {
-            label: '購入へ',
+            label: '購入',
             action: () => router.replace('/purchase')
           }
         }
@@ -69,7 +69,10 @@ export function ErrorModal({
       case 'INVALID_INPUT':
         return {
           title: '画像を読み込めませんでした',
-          message: customMessage || '画像を読み込めませんでした。別の画像でもう一度試してみてください。\n\n対応形式：JPG / PNG',
+          message: getCreditConsumedMessage(
+            customMessage || '画像を読み込めませんでした。別の画像でもう一度試してみてください。\n\n対応形式：JPG / PNG',
+            creditConsumed
+          ),
           showRequestId: true,
           showSupport: true,
           primaryButton: null
