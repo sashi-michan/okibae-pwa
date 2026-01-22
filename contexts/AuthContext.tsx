@@ -11,7 +11,7 @@ type AuthContextType = {
   userData: UserData | null
   loading: boolean
   authLoading: boolean
-  errorReason: 'fetch_failed' | null
+  errorReason: 'fetch_failed' | nullimage.png
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   refreshUserData: () => Promise<void>
@@ -49,6 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserData(null)
     setUser(null)
     setSession(null)
+    setAuthLoading(false)
+    setDataLoading(false)
 
     // Supabase からログアウト（失敗しても画面遷移は行う）
     try {
