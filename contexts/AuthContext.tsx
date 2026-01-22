@@ -235,16 +235,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
 
-      // TOKEN_REFRESHED などの自動イベントではuserDataを再取得しない
-      // SIGNED_IN または USER_UPDATED のときだけ取得
-      const shouldFetchUserData = event === 'SIGNED_IN' || event === 'USER_UPDATED'
-
-      if (session?.user && shouldFetchUserData) {
-        // すでにuserDataがある場合は、読み込み中表示を出さずにバックグラウンドで更新
-        const shouldShowLoading = !userData
-        if (shouldShowLoading) {
-          setDataLoading(true)
-        }
+      if (session?.user) {
+        setDataLoading(true)
         logger.dev('[AuthContext] userData fetch: start (onAuthStateChange)')
 
         // fetchUserData に5秒タイムアウトを設定
@@ -275,9 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           // 3回未満ならエラーモーダルは出さない（バックグラウンドで自動リトライ）
         }
-        if (shouldShowLoading) {
-          setDataLoading(false)
-        }
+        setDataLoading(false)
       } else {
         setUserData(null)
       }

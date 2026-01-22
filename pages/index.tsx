@@ -157,8 +157,6 @@ export default function Home() {
 
       const { imgUrl: reqImgUrl, bg: reqBg, weather: reqWeather, aspectRatio: reqAspectRatio, originalSize: reqOriginalSize } = appState.request
 
-      console.log('[司令塔useEffect] Starting generation with request:', appState.request)
-
       if (cancelled) return
       setAppState(prev => ({ ...prev, status: 'loading' }))
 
@@ -340,8 +338,6 @@ export default function Home() {
       selectedBgId: bgIdMap[bg],
       startedAt: Date.now(),
     }
-
-    console.log('[handleGenerateFinal] Request snapshot created:', request)
 
     // 最終レンダリング開始 + jobIdをインクリメント
     setAppState(prev => ({

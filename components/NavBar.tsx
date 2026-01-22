@@ -44,7 +44,6 @@ export default function NavBar() {
   }, [router])
 
   const handleSignOut = useCallback(async () => {
-    console.log('ログアウトボタンがクリックされました')
     setIsMenuOpen(false)
 
     try {
