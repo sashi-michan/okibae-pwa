@@ -236,7 +236,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        setDataLoading(true)
+        // すでにuserDataがある場合は、読み込み中表示を出さずにバックグラウンドで更新
+        const shouldShowLoading = !userData
+        if (shouldShowLoading) {
+          setDataLoading(true)
+        }
         logger.dev('[AuthContext] userData fetch: start (onAuthStateChange)')
 
         // fetchUserData に5秒タイムアウトを設定
@@ -267,7 +271,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           // 3回未満ならエラーモーダルは出さない（バックグラウンドで自動リトライ）
         }
-        setDataLoading(false)
+        if (shouldShowLoading) {
+          setDataLoading(false)
+        }
       } else {
         setUserData(null)
       }
