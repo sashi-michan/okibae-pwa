@@ -36,8 +36,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 認証エラー時の共通処理（一元化 & 二重発火防止）
   const handleAuthFailure = async (reason: 'restore_failed' | 'fetch_failed') => {
+    console.log('🔴 [DEBUG] handleAuthFailure called:', { reason, alreadyHandled: authFailureHandledRef.current }) // TODO: 後で削除
+
     // 二重発火防止ガード
     if (authFailureHandledRef.current) {
+      console.warn('⚠️ [DEBUG] handleAuthFailure already called, skipping') // TODO: 後で削除
       logger.warn('handleAuthFailure already called, skipping duplicate execution')
       return
     }
@@ -59,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logger.error('signOut failed in handleAuthFailure:', e)
     } finally {
       // ログイン画面へリダイレクト（理由をクエリパラメータで渡す）
+      console.log('🔄 [DEBUG] Redirecting to:', `/login?reason=${reason}`) // TODO: 後で削除
       router.replace(`/login?reason=${reason}`)
     }
   }
