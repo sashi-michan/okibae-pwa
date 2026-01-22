@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
   const [errorReason, setErrorReason] = useState<'fetch_failed' | null>(null)
+  const [fetchRetryCount, setFetchRetryCount] = useState(0)
   const authFailureHandledRef = useRef(false)
   const router = useRouter()
 
@@ -254,11 +255,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logger.dev('[AuthContext] userData fetch: ok')
           setUserData(result.data)
           setErrorReason(null)
+          setFetchRetryCount(0) // 成功したらリセット
         } else {
           logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
-          // ユーザーデータ取得失敗してもセッションは有効なのでログアウトしない
-          // エラー状態だけセットする
-          setErrorReason('fetch_failed')
+          const newRetryCount = fetchRetryCount + 1
+          setFetchRetryCount(newRetryCount)
+
+          // 3回以上失敗したらエラーモーダルを表示
+          if (newRetryCount >= 3) {
+            setErrorReason('fetch_failed')
+          }
+          // 3回未満ならエラーモーダルは出さない（バックグラウンドで自動リトライ）
         }
         setDataLoading(false)
       } else {
@@ -304,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUserData = async () => {
     if (user) {
       setDataLoading(true)
+      setFetchRetryCount(0) // 手動リトライ時はカウントリセット
       const result = await fetchUserData(user.id)
       if (result.success) {
         setUserData(result.data)
