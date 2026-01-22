@@ -268,9 +268,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserData(result.data)
           setErrorReason(null)
         } else {
+          console.log('⚠️ [DEBUG] userData fetch failed, but keeping session') // TODO: 後で削除
           logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
-          // いずれの失敗もログインページへリダイレクト
-          await handleAuthFailure(result.reason)
+          // ユーザーデータ取得失敗してもセッションは有効なのでログアウトしない
+          // エラー状態だけセットする
+          setErrorReason('fetch_failed')
         }
         setDataLoading(false)
       } else {
