@@ -11,7 +11,7 @@ type AuthContextType = {
   userData: UserData | null
   loading: boolean
   authLoading: boolean
-  errorReason: 'fetch_failed' | nullimage.png
+  errorReason: 'fetch_failed' | null
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   refreshUserData: () => Promise<void>
