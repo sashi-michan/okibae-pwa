@@ -230,7 +230,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      logger.dev('[AuthContext] onAuthStateChange:', { event, hasSession: !!session })
+      console.log('🔔 [DEBUG] onAuthStateChange:', { event, hasSession: !!session }) // TODO: 後で削除
+
+      // 認証状態が確定したので authLoading を false にする
+      finishAuthInit()
 
       // ログイン成功時に authFailureHandledRef をリセット
       if (event === 'SIGNED_IN') {
@@ -271,7 +274,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      console.log('🧹 [DEBUG] useEffect cleanup') // TODO: 後で削除
+      clearTimeout(overallTimeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signInWithGoogle = async () => {
