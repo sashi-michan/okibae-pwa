@@ -38,13 +38,6 @@ export default function NavBar() {
   const balance = userData?.credits.balance ?? 0
   const isPro = userData?.subscription.status === 'pro'
 
-  // デバッグ: プロフィール画像URLを確認
-  useEffect(() => {
-    if (mounted && user) {
-      console.log('[NavBar] user.user_metadata:', user.user_metadata)
-      console.log('[NavBar] avatar_url:', user.user_metadata?.avatar_url)
-    }
-  }, [mounted, user])
 
   const handlePurchase = useCallback(() => {
     router.push('/purchase')

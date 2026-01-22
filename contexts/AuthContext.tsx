@@ -36,11 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 認証エラー時の共通処理（一元化 & 二重発火防止）
   const handleAuthFailure = async (reason: 'restore_failed' | 'fetch_failed') => {
-    console.log('🔴 [DEBUG] handleAuthFailure called:', { reason, alreadyHandled: authFailureHandledRef.current }) // TODO: 後で削除
-
     // 二重発火防止ガード
     if (authFailureHandledRef.current) {
-      console.warn('⚠️ [DEBUG] handleAuthFailure already called, skipping') // TODO: 後で削除
       logger.warn('handleAuthFailure already called, skipping duplicate execution')
       return
     }
@@ -62,7 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logger.error('signOut failed in handleAuthFailure:', e)
     } finally {
       // ログイン画面へリダイレクト（理由をクエリパラメータで渡す）
-      console.log('🔄 [DEBUG] Redirecting to:', `/login?reason=${reason}`) // TODO: 後で削除
       router.replace(`/login?reason=${reason}`)
     }
   }
@@ -159,11 +155,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    console.log('🔵 [DEBUG] AuthContext useEffect started') // TODO: 後で削除
-
     // 全体タイムアウト（10秒）
     const overallTimeout = setTimeout(() => {
-      console.error('🚨 [DEBUG] 全体タイムアウト（10秒超過）') // TODO: 後で削除
+      logger.error('[AuthContext] Overall timeout (10s)')
       handleAuthFailure('fetch_failed')
     }, 10000)
 
@@ -172,20 +166,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       supabase.auth.getSession(),
       new Promise<{ data: { session: null } }>((resolve) =>
         setTimeout(() => {
-          console.error('⏱️ [DEBUG] getSession タイムアウト（3秒）') // TODO: 後で削除
+          logger.error('[AuthContext] getSession timeout (3s)')
           resolve({ data: { session: null } })
         }, 3000)
       ),
     ])
 
     getSessionPromise.then(async ({ data: { session } }) => {
-      console.log('✅ [DEBUG] getSession result:', { hasSession: !!session, userId: session?.user?.id }) // TODO: 後で削除
+      logger.dev('[AuthContext] getSession:', { hasSession: !!session, userId: session?.user?.id })
       setSession(session)
       setUser(session?.user ?? null)
       finishAuthInit()
 
       if (session?.user) {
-        console.log('🟡 [DEBUG] ユーザーデータ取得開始') // TODO: 後で削除
         setDataLoading(true)
         logger.dev('[AuthContext] userData fetch: start')
 
@@ -194,32 +187,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchUserData(session.user.id),
           new Promise<FetchResult>((resolve) =>
             setTimeout(() => {
-              console.error('⏱️ [DEBUG] userData fetch タイムアウト（5秒）') // TODO: 後で削除
+              logger.error('[AuthContext] userData fetch timeout (5s)')
               resolve({ success: false, reason: 'fetch_failed' })
             }, 5000)
           ),
         ])
 
         const result = await fetchPromise
-        console.log('📊 [DEBUG] fetchPromise result:', result) // TODO: 後で削除
         if (result.success) {
-          console.log('✅ [DEBUG] userData fetch 成功') // TODO: 後で削除
           setUserData(result.data)
           setErrorReason(null)
           clearTimeout(overallTimeout) // 成功したらタイムアウト解除
         } else {
-          console.error('❌ [DEBUG] userData fetch 失敗:', result.reason) // TODO: 後で削除
           clearTimeout(overallTimeout) // 失敗確定したのでタイムアウト解除
           if (result.reason === 'restore_failed') {
             await handleAuthFailure(result.reason)
           } else {
             // fetch_failed の場合はログインページにリダイレクト
-            console.log('🔄 [DEBUG] handleAuthFailure 呼び出し前') // TODO: 後で削除
             await handleAuthFailure('fetch_failed')
-            console.log('🔄 [DEBUG] handleAuthFailure 呼び出し後') // TODO: 後で削除
           }
         }
-        console.log('🟢 [DEBUG] setDataLoading(false)') // TODO: 後で削除
         setDataLoading(false)
       } else {
         clearTimeout(overallTimeout) // セッションなしなのでタイムアウト解除
@@ -234,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 [DEBUG] onAuthStateChange:', { event, hasSession: !!session }) // TODO: 後で削除
+      logger.dev('[AuthContext] onAuthStateChange:', { event, hasSession: !!session })
 
       // 認証状態が確定したので authLoading を false にする
       finishAuthInit()
@@ -256,7 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchUserData(session.user.id),
           new Promise<FetchResult>((resolve) =>
             setTimeout(() => {
-              logger.error('[AuthContext] userData fetch タイムアウト（5秒） in onAuthStateChange')
+              logger.error('[AuthContext] userData fetch timeout (5s) in onAuthStateChange')
               resolve({ success: false, reason: 'fetch_failed' })
             }, 5000)
           ),
@@ -268,7 +255,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserData(result.data)
           setErrorReason(null)
         } else {
-          console.log('⚠️ [DEBUG] userData fetch failed, but keeping session') // TODO: 後で削除
           logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
           // ユーザーデータ取得失敗してもセッションは有効なのでログアウトしない
           // エラー状態だけセットする
@@ -281,7 +267,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => {
-      console.log('🧹 [DEBUG] useEffect cleanup') // TODO: 後で削除
       clearTimeout(overallTimeout)
       subscription.unsubscribe()
     }
