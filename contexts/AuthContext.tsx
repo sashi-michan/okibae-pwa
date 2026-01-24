@@ -26,8 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
   const [errorReason, setErrorReason] = useState<'fetch_failed' | null>(null)
-  const [fetchRetryCount, setFetchRetryCount] = useState(0)
   const authFailureHandledRef = useRef(false)
+  const fetchingUserIdRef = useRef<string | null>(null) // dedupe用：現在取得中のuserId
   const router = useRouter()
 
   // 初期化完了ヘルパー（auth確認完了）
@@ -64,18 +64,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // リトライヘルパー（バックオフ: 300ms → 1000ms → 2000ms）
+  // リトライヘルパー（バックオフ: 1s → 2s → 4s）
   const retryWithBackoff = async <T,>(
     fn: () => Promise<T>,
-    delays: number[] = [300, 1000, 2000]
+    delays: number[] = [1000, 2000, 4000],
+    timeoutMs: number = 8000  // 各試行は8秒でタイムアウト（未使用、タブ復帰時の遅延対策）
   ): Promise<T | null> => {
     for (let i = 0; i < delays.length; i++) {
       try {
+        // タブ復帰時のネットワーク遅延対策：タイムアウトなしで待つ
         return await fn()
       } catch (error) {
+        logger.warn(`Retry attempt ${i + 1}/${delays.length} failed`, error)
         if (i < delays.length - 1) {
           await new Promise(resolve => setTimeout(resolve, delays[i]))
         } else {
+          logger.error('All retry attempts failed')
           return null
         }
       }
@@ -92,11 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async (userId: string, didRestore = false): Promise<FetchResult> => {
     // Step 1: データ取得（リトライあり）
     const result = await retryWithBackoff(async () => {
-      const [profileRes, subscriptionRes, creditsRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('subscriptions').select('*').eq('user_id', userId).single(),
-        supabase.from('credits').select('*').eq('user_id', userId).single(),
-      ])
+      const profileRes = await supabase.from('profiles').select('*').eq('id', userId).single()
+      const subscriptionRes = await supabase.from('subscriptions').select('*').eq('user_id', userId).single()
+      const creditsRes = await supabase.from('credits').select('*').eq('user_id', userId).single()
 
       if (profileRes.error || subscriptionRes.error || creditsRes.error) {
         logger.error('Failed to fetch user data:', {
@@ -155,66 +157,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, data: result }
   }
 
+  // userData を保証する関数（dedupe機能付き）
+  const ensureUserData = async (session: Session | null, caller: string) => {
+    if (!session?.user) {
+      logger.dev(`[ensureUserData from ${caller}] no session, skipping`)
+      // getSession 側では何も消さない（onAuthStateChange が先に取得中の可能性）
+      // onAuthStateChange 側のみ、明示的にクリア
+      if (caller === 'onAuthStateChange') {
+        setUserData(null)
+      }
+      return
+    }
+
+    const userId = session.user.id
+
+    // 同じuserIdで既に取得中なら skip（dedupe）
+    if (fetchingUserIdRef.current === userId) {
+      logger.dev(`[ensureUserData from ${caller}] already fetching userId=${userId}, skipping`)
+      return
+    }
+
+    // 取得開始
+    fetchingUserIdRef.current = userId
+    setDataLoading(true)
+    logger.dev(`[ensureUserData from ${caller}] userData fetch: start`)
+
+    // 5秒後に警告ログ（取得は継続）
+    const slowWarning = setTimeout(() => {
+      logger.warn(`[ensureUserData from ${caller}] userData fetch is slow (>5s)`)
+    }, 5000)
+
+    // fetchUserData は内部でバックオフリトライ (1s, 2s, 4s) を実行
+    const result = await fetchUserData(userId)
+
+    clearTimeout(slowWarning)
+    fetchingUserIdRef.current = null // 取得完了
+
+    if (result.success) {
+      logger.dev(`[ensureUserData from ${caller}] userData fetch: ok`)
+      setUserData(result.data)
+      setErrorReason(null)
+    } else {
+      // 3回リトライ後の失敗
+      logger.error(`[ensureUserData from ${caller}] userData fetch: all retries failed`, { reason: result.reason })
+
+      if (result.reason === 'restore_failed') {
+        // 復活失敗は致命的エラー → ログアウト
+        await handleAuthFailure(result.reason)
+      } else {
+        // fetch_failed はエラー表示のみ（ログアウトしない）
+        setErrorReason('fetch_failed')
+      }
+    }
+    setDataLoading(false)
+  }
+
   useEffect(() => {
-    // 全体タイムアウト（10秒）
-    const overallTimeout = setTimeout(() => {
-      logger.error('[AuthContext] Overall timeout (10s)')
-      handleAuthFailure('fetch_failed')
-    }, 10000)
+    let sessionResolved = false
 
-    // 初回セッション取得（3秒タイムアウト）
-    const getSessionPromise = Promise.race([
-      supabase.auth.getSession(),
-      new Promise<{ data: { session: null } }>((resolve) =>
-        setTimeout(() => {
-          logger.error('[AuthContext] getSession timeout (3s)')
-          resolve({ data: { session: null } })
-        }, 3000)
-      ),
-    ])
+    // Hard timeout (15秒): 認証状態が確定できない場合
+    const hardTimeout = setTimeout(() => {
+      if (!sessionResolved) {
+        logger.error('[AuthContext] Hard timeout (15s): auth state unresolved')
+        setAuthLoading(false)
+        setErrorReason('fetch_failed')
+      }
+    }, 15000)
 
-    getSessionPromise.then(async ({ data: { session } }) => {
+    // getSession の遅延警告 (3秒)
+    const slowWarningTimeout = setTimeout(() => {
+      logger.warn('[AuthContext] getSession is slow (>3s), will rely on onAuthStateChange')
+    }, 3000)
+
+    // 初回セッション取得（タイムアウトなし）
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(slowWarningTimeout)
+      sessionResolved = true
+      clearTimeout(hardTimeout)
+
       logger.dev('[AuthContext] getSession:', { hasSession: !!session, userId: session?.user?.id })
-      setSession(session)
-      setUser(session?.user ?? null)
+
+      // null上書き防止: 既に値がある場合は上書きしない
+      setSession(prev => prev ?? session)
+      setUser(prev => prev ?? (session?.user ?? null))
       finishAuthInit()
 
-      if (session?.user) {
-        setDataLoading(true)
-        logger.dev('[AuthContext] userData fetch: start')
-
-        // fetchUserData に5秒タイムアウトを設定
-        const fetchPromise = Promise.race([
-          fetchUserData(session.user.id),
-          new Promise<FetchResult>((resolve) =>
-            setTimeout(() => {
-              logger.error('[AuthContext] userData fetch timeout (5s)')
-              resolve({ success: false, reason: 'fetch_failed' })
-            }, 5000)
-          ),
-        ])
-
-        const result = await fetchPromise
-        if (result.success) {
-          setUserData(result.data)
-          setErrorReason(null)
-          clearTimeout(overallTimeout) // 成功したらタイムアウト解除
-        } else {
-          clearTimeout(overallTimeout) // 失敗確定したのでタイムアウト解除
-          if (result.reason === 'restore_failed') {
-            await handleAuthFailure(result.reason)
-          } else {
-            // fetch_failed の場合はログインページにリダイレクト
-            await handleAuthFailure('fetch_failed')
-          }
-        }
-        setDataLoading(false)
-      } else {
-        clearTimeout(overallTimeout) // セッションなしなのでタイムアウト解除
-      }
+      // userDataを保証（dedupe機能付き）非同期で並列実行
+      ensureUserData(session, 'getSession')
     }).catch((error) => {
       logger.error('[AuthContext] getSession error:', error)
-      clearTimeout(overallTimeout)
+      clearTimeout(hardTimeout)
       handleAuthFailure('fetch_failed')
     })
 
@@ -225,6 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logger.dev('[AuthContext] onAuthStateChange:', { event, hasSession: !!session })
 
       // 認証状態が確定したので authLoading を false にする
+      sessionResolved = true
+      clearTimeout(hardTimeout)
       finishAuthInit()
 
       // ログイン成功時に authFailureHandledRef をリセット
@@ -235,46 +269,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
 
-      if (session?.user) {
-        setDataLoading(true)
-        logger.dev('[AuthContext] userData fetch: start (onAuthStateChange)')
-
-        // fetchUserData に5秒タイムアウトを設定
-        const fetchPromise = Promise.race([
-          fetchUserData(session.user.id),
-          new Promise<FetchResult>((resolve) =>
-            setTimeout(() => {
-              logger.error('[AuthContext] userData fetch timeout (5s) in onAuthStateChange')
-              resolve({ success: false, reason: 'fetch_failed' })
-            }, 5000)
-          ),
-        ])
-
-        const result = await fetchPromise
-        if (result.success) {
-          logger.dev('[AuthContext] userData fetch: ok')
-          setUserData(result.data)
-          setErrorReason(null)
-          setFetchRetryCount(0) // 成功したらリセット
-        } else {
-          logger.dev('[AuthContext] userData fetch: fail', { reason: result.reason })
-          const newRetryCount = fetchRetryCount + 1
-          setFetchRetryCount(newRetryCount)
-
-          // 3回以上失敗したらエラーモーダルを表示
-          if (newRetryCount >= 3) {
-            setErrorReason('fetch_failed')
-          }
-          // 3回未満ならエラーモーダルは出さない（バックグラウンドで自動リトライ）
-        }
-        setDataLoading(false)
-      } else {
-        setUserData(null)
-      }
+      // userDataを保証（dedupe機能付き）非同期で並列実行
+      ensureUserData(session, 'onAuthStateChange')
     })
 
     return () => {
-      clearTimeout(overallTimeout)
+      clearTimeout(hardTimeout)
+      clearTimeout(slowWarningTimeout)
       subscription.unsubscribe()
     }
   }, [])
@@ -311,7 +312,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUserData = async () => {
     if (user) {
       setDataLoading(true)
-      setFetchRetryCount(0) // 手動リトライ時はカウントリセット
       const result = await fetchUserData(user.id)
       if (result.success) {
         setUserData(result.data)
