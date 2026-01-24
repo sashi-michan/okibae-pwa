@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router'
+import Link from 'next/link'
 
 export default function About() {
   const router = useRouter()
@@ -38,11 +39,12 @@ export default function About() {
                 背景や光の雰囲気を選ぶだけで、AIが自動でおしゃれな画像を生成します。
               </p>
               <p>
-                minneやオンラインショップ、SNS投稿などにご自由にご活用いただけます🫶
+                minneなどのオンラインショップ、SNS投稿などにご自由にご活用いただけます。<br />
+                商用利用の際は、下の注意事項をよくご確認ください。
               </p>
               <div className="bg-orange-50 border-l-4 border-orange-200 p-4 rounded-r-lg" style={{backgroundColor: '#EDBC9D20'}}>
                 <p className="text-orange-600 text-sm" style={{color: '#B8899A'}}>
-                  ※このアプリは現在 <strong>α版</strong>（2025年9月11日現在）です。<br/>
+                  ※このアプリは現在 <strong>β版</strong>（2026年1月7日現在）です。<br/>
                   機能や仕様は今後変更されることがあります。
                 </p>
               </div>
@@ -65,7 +67,7 @@ export default function About() {
               </div>
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 bg-brand-500 text-white rounded-full text-xs font-bold flex items-center justify-center">3</span>
-                <p className="typography-body">天気（晴れ・くもり・雨）を選ぶ</p>
+                <p className="typography-body">天気（晴れ・くもり・雨）を選ぶ<br />光の当たり方や空気感が変わります</p>
               </div>
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 bg-brand-500 text-white rounded-full text-xs font-bold flex items-center justify-center">4</span>
@@ -89,26 +91,66 @@ export default function About() {
             <h2 className="typography-step-title mb-4">
               利用上の注意
             </h2>
-            <div className="space-y-3 typography-body">
-              <div className="flex items-start gap-2">
-                <span className="text-brand-500">•</span>
-                <p>1日に生成できる画像は現在「5枚まで」です</p>
+            <div className="space-y-6 typography-body">
+              {/* 1. 著作権と「使ってよい写真」について */}
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>1. 著作権と「使ってよい写真」について</h3>
+                <p className="mb-2">
+                  アップロードする写真は、ご自身で撮影したものや、権利者から許可を得ているものを使ってください。<br />
+                  以下のような画像の使用はお控えください（法律で禁止されている場合があります）。
+                </p>
+                <ul className="ml-4 space-y-1">
+                  <li>・❌ ネットで拾った画像（他人が撮った写真）</li>
+                  <li>・❌ 漫画・アニメのキャラクターや、有名人が写っている画像※</li>
+                  <li>・❌ 他の作家さんの作品画像（許可なく加工すること）</li>
+                </ul>
+                <p className="text-sm mt-2" style={{ color: '#666' }}>※キャラクターグッズなどをご自身で撮影されたものであればご利用いただけます</p>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-brand-500">•</span>
-                <p>著作権のある画像は使用できません。ご自身で撮影した写真をお使いください</p>
+
+              {/* 2. 「AI生成画像であること」の記載を推奨しています */}
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>2. 「AI生成画像であること」の記載を推奨しています</h3>
+                <p className="mb-2">
+                  本アプリはAI（人工知能）を使って背景を描き出しています。<br />
+                  フリマアプリやSNSに投稿する際は、見た人が「実物もこの背景で撮ったのかな？」と誤解しないよう、<br />
+                  キャプションなどに一言添えていただくことをおすすめします。
+                </p>
+                <div className="bg-orange-50 border-l-4 border-orange-200 p-3 rounded-r-lg mt-2" style={{backgroundColor: '#EDBC9D20'}}>
+                  <p className="text-sm" style={{ color: '#B8899A' }}>
+                    <strong>おすすめの書き方例：</strong><br />
+                    ・「※背景はAIによって作成したイメージです」<br />
+                    ・「※背景は演出として合成しています」
+                  </p>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-brand-500">•</span>
-                <p>アップロードされた画像は、AIで処理するために外部の画像生成サービスに一時的に送信されます</p>
+
+              {/* 3. AIの「うっかり」にご注意ください */}
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>3. AIの「うっかり」にご注意ください</h3>
+                <p className="mb-2">
+                  商品自体が変形・変更などされないように調整していますが、まれに不思議な画像が作られてしまうことがあります。<br />
+                  念のため、保存する前に必ず<strong>「商品の見た目や魅力が正しく伝わっているか」</strong>をご自身の目でチェックしてください。
+                </p>
+                <p className="text-sm" style={{ color: '#666' }}>
+                  フリマアプリで利用する場合、商品の傷や汚れが消えてしまうとトラブルの元となる恐れがありますのでご注意ください。
+                </p>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-brand-500">•</span>
-                <p>生成画像は実際の色味・質感と異なる場合があります</p>
+
+              {/* 4. 商用利用について */}
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>4. 商用利用について</h3>
+                <p className="mb-2">
+                  作成した画像は、ECサイト、SNS、チラシなどで商用利用（お仕事での利用）OKです！<br />
+                  ただし、その画像を使って起きたトラブル（例：「実物と違う！」というクレームなど）については、<br />
+                  ユーザー様ご自身の責任で対応をお願いいたします。
+                </p>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-brand-500">•</span>
-                <p>不適切な内容、公序良俗に反する利用は禁止です</p>
+
+              {/* 利用規約リンク */}
+              <div className="mt-4 pt-4 border-t border-pink-100">
+                <p className="text-sm" style={{ color: '#666' }}>
+                  詳しくは<Link href="/terms" className="text-brand-600 hover:text-brand-700 underline">利用規約</Link>をご確認ください。
+                </p>
               </div>
             </div>
           </div>
@@ -120,9 +162,29 @@ export default function About() {
             </h2>
             <div className="space-y-4 typography-body">
               <p>
-                このアプリでは個人情報の収集は行っていません。<br/>
-                アップロード画像は生成処理のために一時的に扱いますが、サーバー上に保存はされません。
+                本アプリでは、皆様の大切な作品画像を守るため、以下の仕組みで運用しています。
               </p>
+
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>・画像は保存されません</h3>
+                <p>
+                  アップロードされた画像は、AIによる背景生成処理を行うためだけに使用し、アプリ（サーバー）内に保存・蓄積することはありません。<br />
+                  処理が終わり次第、データはメモリから消去されます。
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-bold mb-2" style={{ color: '#666' }}>・AIの学習には使われません</h3>
+                <p>
+                  画像生成エンジンには、セキュリティ強度の高い「Google Vertex AI」を採用しています。ここで処理される画像データが、AIの学習（トレーニング）に勝手に利用されることはありません。
+                </p>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-pink-100">
+                <p className="text-sm" style={{ color: '#666' }}>
+                  詳しくは<Link href="/privacy" className="text-brand-600 hover:text-brand-700 underline">プライバシーポリシー</Link>をご確認ください。
+                </p>
+              </div>
             </div>
           </div>
         </div>
