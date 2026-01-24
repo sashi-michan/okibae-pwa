@@ -32,7 +32,7 @@ type AppState = {
 
 export default function Home() {
   // 認証チェック
-  const { user, loading, authLoading, errorReason, refreshUserData } = useAuth()
+  const { user, userData, loading, authLoading, errorReason, refreshUserData } = useAuth()
   const router = useRouter()
 
   // デバイス判定とPWAインストール状態
@@ -49,7 +49,6 @@ export default function Home() {
   const [modalImage, setModalImage] = useState<string | null>(null)
   const [appState, setAppState] = useState<AppState>({ phase: 'IDLE', jobId: 0 })
   const [imageKey, setImageKey] = useState('')               // 新しい画像で無効化
-  const [dailyUsage, setDailyUsage] = useState({ count: 0, date: '' })
   const [showLineBrowserDialog, setShowLineBrowserDialog] = useState(false)
   const [canShare, setCanShare] = useState(false)           // Web Share API対応チェック
 
@@ -67,9 +66,7 @@ export default function Home() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
-
-  // デバッグモード（開発時は制限なし）
-  const DEBUG_MODE = process.env.NODE_ENV === 'development'
+  const outputSectionRef = useRef<HTMLDivElement | null>(null)
 
   // デバッグ用クエリパラメータ取得
   const debugStatus = router.query.debugStatus as string | undefined
@@ -102,28 +99,6 @@ export default function Home() {
       navigator.share !== undefined &&
       navigator.canShare !== undefined
     )
-  }, [])
-
-  // 日次使用制限の管理
-  useEffect(() => {
-    const initDailyUsage = () => {
-      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-      const savedDate = localStorage.getItem('okibae-date')
-      const savedCount = localStorage.getItem('okibae-count')
-
-      if (savedDate === today && savedCount) {
-        // 今日のデータがある場合
-        const count = parseInt(savedCount, 10)
-        setDailyUsage({ count, date: today })
-      } else {
-        // 初回または日付が変わった場合はリセット
-        localStorage.setItem('okibae-date', today)
-        localStorage.setItem('okibae-count', '0')
-        setDailyUsage({ count: 0, date: today })
-      }
-    }
-
-    initDailyUsage()
   }, [])
 
   useEffect(() => {
@@ -201,18 +176,13 @@ export default function Home() {
       // 生成成功 - FINAL_READY へ遷移
       setAppState(prev => ({ ...prev, phase: 'FINAL_READY', finalImageUrl: result.imageBase64, status: undefined }))
 
-      // 使用回数をカウントアップ（stale回避）
-      setDailyUsage(prev => {
-        const newCount = prev.count + 1
-        localStorage.setItem('okibae-count', newCount.toString())
-        return { ...prev, count: newCount }
-      })
-
       // クレジット残高を再取得してNavBarを更新
       await refreshUserData()
 
-      // ナビバー更新のためのイベント発火
-      window.dispatchEvent(new Event('okibae-usage-update'))
+      // 生成完了後、Step4（出力エリア）にスムーズスクロール
+      setTimeout(() => {
+        outputSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
     }
 
     handleStateTransition()
@@ -241,8 +211,8 @@ export default function Home() {
     img.src = appState.finalImageUrl
   }, [appState.finalImageUrl])
 
-  // 初回認証チェック中、またはデータ読み込み中は何も表示しない
-  if (authLoading || loading) {
+  // 初回認証チェック中は何も表示しない
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-cream-50 to-orange-50">
         <div className="text-gray-600">読み込み中...</div>
@@ -543,7 +513,7 @@ export default function Home() {
             </div>
           </StepCard>
 
-          <StepCard stepNumber={4} title="保存" className="animate-slide-up">
+          <StepCard ref={outputSectionRef} stepNumber={4} title="保存" className="animate-slide-up">
             {/* サイズ選択UI - Vertex AI制限により一時的に非表示
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">出力サイズ</label>
@@ -556,9 +526,9 @@ export default function Home() {
             <button
               className="btn btn-primary disabled:opacity-50 mb-4"
               onClick={handleGenerateFinal}
-              disabled={!imgUrl || appState.phase === 'FINAL_RENDERING' || (!DEBUG_MODE && dailyUsage.count >= 5)}
+              disabled={!imgUrl || appState.phase === 'FINAL_RENDERING' || !userData || userData.credits.balance === 0}
             >
-              {(!DEBUG_MODE && dailyUsage.count >= 5) ? '本日の上限に達しました' :
+              {(!userData || userData.credits.balance === 0) ? 'クレジットが不足しています' :
                appState.phase === 'FINAL_RENDERING' ? '生成中...' :
                appState.phase === 'FINAL_READY' ? '再生成！' : '生成！'}
             </button>
