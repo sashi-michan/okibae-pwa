@@ -6,7 +6,7 @@ import { LegalModal } from '../components/LegalModal'
 import { ErrorModal, ErrorType } from '../components/ErrorModal'
 
 export default function Login() {
-  const { user, loading, signInWithGoogle } = useAuth()
+  const { user, authLoading, signInWithGoogle } = useAuth()
   const router = useRouter()
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [errorType, setErrorType] = useState<ErrorType | null>(null)
@@ -14,7 +14,7 @@ export default function Login() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false)
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!authLoading && user) {
       router.push('/')
       return
     }
@@ -33,7 +33,7 @@ export default function Login() {
     } else if (reason === 'signout_failed') {
       setErrorType('AUTH_SIGNOUT_FAILED')
     }
-  }, [user, loading, router])
+  }, [user, authLoading, router])
 
   const handleGoogleSignIn = async () => {
     try {
@@ -68,7 +68,7 @@ export default function Login() {
     window.location.reload()
   }
 
-  if (loading || isSigningIn) {
+  if (authLoading || isSigningIn) {
     return (
       <div className="min-h-screen grid place-items-center bg-[#fdfcfb]">
         <div className="text-center">

@@ -116,7 +116,7 @@ export default function NavBar() {
             />
           </Link>
           <div className="flex items-center gap-4 text-sm menu-container relative">
-            {mounted && userData && (
+            {mounted && user && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{
                 backgroundColor: !isPro && balance === 0 ? '#FEE2E2' :
                                !isPro && balance <= 5 ? '#FED7AA' :
@@ -126,7 +126,7 @@ export default function NavBar() {
                        'white'
               }}>
                 <span className="text-xs font-medium">
-                  {isPro ? `Pro ${balance}回` : `のこり ${balance}回`}
+                  {userData ? (isPro ? `Pro ${balance}回` : `のこり ${balance}回`) : '--'}
                 </span>
                 <button
                   onClick={handlePurchase}
