@@ -85,21 +85,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const host = req.headers['x-forwarded-host'] || req.headers.host
     const baseUrl = `${protocol}://${host}`
 
-    // 環境変数デバッグ
-    const priceId = process.env.STRIPE_CREDITS_PRICE_ID
-    console.log('[DEBUG] STRIPE_CREDITS_PRICE_ID:', priceId ? 'set' : 'NOT SET')
-
-    if (!priceId) {
-      return res.status(500).json({ error: 'STRIPE_CREDITS_PRICE_ID environment variable is not set' })
-    }
-
     // Checkout Session作成
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price: process.env.STRIPE_CREDITS_PRICE_ID!,
           quantity: 1,
         },
       ],
