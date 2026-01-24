@@ -80,19 +80,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // DB保存はWebhookで行う（決済成功時に確実に保存）
     }
 
+    // リクエスト元のURLを取得（Vercel環境で動的に変わるため）
+    const protocol = req.headers['x-forwarded-proto'] || 'https'
+    const host = req.headers['x-forwarded-host'] || req.headers.host
+    const baseUrl = `${protocol}://${host}`
+
     // Checkout Session作成
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID!,
+          price: process.env.STRIPE_CREDITS_PRICE_ID!,
           quantity: 1,
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.SITE_URL}/?payment=success`,
-      cancel_url: `${process.env.SITE_URL}/?payment=canceled`,
+      success_url: `${baseUrl}/?payment=success`,
+      cancel_url: `${baseUrl}/?payment=canceled`,
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,
