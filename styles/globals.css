@@ -313,3 +313,71 @@ body {
     @apply -right-4;
   }
 }
+
+/* 韓国風・くすみブラウン系の設定 */
+:root {
+  /* 落ち着いたベージュ〜モカ系のパレット */
+  --blob-color-1: #e8d7c9; /* サンドベージュ */
+  --blob-color-2: #d4c4b7; /* モカグレージュ */
+  --blob-color-3: #f2eadd; /* エクリュ */
+}
+
+body {
+  font-family: 'Noto Sans JP', 'Noto Sans', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  /* 全体の背景色も少し温かみのある色に */
+  background-color: #fdfcfb;
+}
+
+/* ぽよぽよ動く背景の形（色は変えたけど動きはそのまま） */
+.blob-shape {
+  position: absolute;
+  filter: blur(60px); /* ぼかしを強くしてより滑らかに */
+  z-index: 0;
+  opacity: 0.7; /* 透明度を少し上げて背景になじませる */
+  animation: blob-bounce 12s infinite ease-in-out;
+}
+
+/* 異なる動きのリズムを作る */
+.blob-1 { top: -15%; left: -15%; width: 600px; height: 600px; background: var(--blob-color-1); animation-delay: 0s; }
+.blob-2 { bottom: -20%; right: -20%; width: 500px; height: 500px; background: var(--blob-color-2); animation-delay: -3s; }
+.blob-3 { top: 30%; right: 10%; width: 400px; height: 400px; background: var(--blob-color-3); animation-delay: -6s; opacity: 0.5; }
+
+@keyframes blob-bounce {
+  0%, 100% { transform: translate(0, 0) scale(1); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+  33% { transform: translate(40px, -30px) scale(1.1); border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
+  66% { transform: translate(-30px, 20px) scale(0.9); border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; }
+}
+
+/* 画像がふわふわ浮くアニメーション */
+.float-element {
+  animation: gentle-float 7s ease-in-out infinite;
+}
+.float-delay-1 { animation-delay: 0s; }
+.float-delay-2 { animation-delay: 2.5s; }
+
+@keyframes gentle-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-24px) rotate(1.5deg); }
+}
+
+/* より背景に溶け込むすりガラス */
+.glass-card {
+  /* 背景色をより透明に、温かみのあるオフホワイトへ */
+  background: rgba(255, 253, 250, 0.5); 
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  /* 枠線をなくして境界を曖昧に */
+  border: 1px solid rgba(255, 255, 255, 0.3); 
+  /* 影を柔らかく温かい色に */
+  box-shadow: 
+    0 4px 6px -1px rgba(186, 176, 164, 0.05), 
+    0 2px 4px -1px rgba(186, 176, 164, 0.03),
+    inset 0 0 20px 5px rgba(255, 255, 255, 0.2); /* 内側にも光を入れて立体感を出す */
+}
+
+/* ボタンのキラッとエフェクト用 */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

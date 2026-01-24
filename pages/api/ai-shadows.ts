@@ -3,6 +3,7 @@ import { VertexAI } from '@google-cloud/vertexai'
 import formidable from 'formidable'
 import fs from 'fs'
 import path from 'path'
+import { createServerSupabaseClient } from '../../lib/supabase/server'
 
 type StyleKey = "white" | "linen" | "concrete" | "wood" | "white_wood";
 type WeatherKey = "sunny" | "cloudy" | "rainy";
@@ -221,10 +222,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    
-    // フォームデータ解析
+    // フォームデータ解析（デバッグパラメータ取得のため最初に実行）
     const { fields, files } = await parseForm(req)
-    
+
+    // デバッグパラメータ取得
+    const debugStatus = fields.debugStatus ? String(Array.isArray(fields.debugStatus) ? fields.debugStatus[0] : fields.debugStatus) : undefined
+    const debugDelay = fields.debugDelay ? parseInt(String(Array.isArray(fields.debugDelay) ? fields.debugDelay[0] : fields.debugDelay)) : undefined
+    const debugOkButNoImage = fields.debugOkButNoImage
+      ? String(Array.isArray(fields.debugOkButNoImage) ? fields.debugOkButNoImage[0] : fields.debugOkButNoImage) === '1'
+      : false
+
+    // デバッグモード処理（開発環境のみ、認証チェックより前に実行）
+    if (process.env.NODE_ENV === 'development') {
+      // デバッグ遅延
+      if (debugDelay) {
+        console.log(`[DEBUG] Delaying response by ${debugDelay}ms`)
+        await new Promise(resolve => setTimeout(resolve, debugDelay))
+      }
+
+      // デバッグステータスコード
+      if (debugStatus) {
+        const statusCode = parseInt(debugStatus)
+        console.log(`[DEBUG] Returning status ${statusCode}`)
+
+        const errorMessages: Record<number, string> = {
+          401: 'ログインが必要です',
+          403: 'クレジットが不足しています',
+          400: '入力データが不正です',
+          500: 'サーバーエラーが発生しました',
+          504: 'タイムアウトしました'
+        }
+
+        return res.status(statusCode).json({
+          ok: false,
+          error: errorMessages[statusCode] || 'Unknown error',
+          requestId: `debug-${Date.now()}`,
+          creditConsumed: false  // テスト用なので常にfalse
+        })
+      }
+
+      // デバッグOKだけど画像なし
+      if (debugOkButNoImage) {
+        console.log('[DEBUG] Returning OK but no image')
+        return res.status(200).json({
+          ok: false,
+          error: '画像生成に失敗しました',
+          requestId: `debug-${Date.now()}`,
+          creditConsumed: false  // テスト用なので常にfalse
+        })
+      }
+    }
+
+    // Supabaseクライアント作成
+    const supabase = createServerSupabaseClient(req, res)
+
+    // 認証チェック
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError)
+      return res.status(401).json({ ok: false, error: 'ログインが必要です' })
+    }
+
+    // クレジット残高チェック
+    const { data: creditsData, error: creditsError } = await supabase
+      .from('credits')
+      .select('balance')
+      .eq('user_id', user.id)
+      .single()
+
+    if (creditsError) {
+      console.error('Credits fetch error:', creditsError)
+      return res.status(500).json({ ok: false, error: 'クレジット情報の取得に失敗しました' })
+    }
+
+    if (!creditsData || creditsData.balance <= 0) {
+      console.log('Insufficient credits:', creditsData?.balance ?? 0)
+      return res.status(403).json({ ok: false, error: 'クレジットが不足しています' })
+    }
+
     // スタイルとファイル取得
     const style = String(Array.isArray(fields.style) ? fields.style[0] : fields.style || 'white').toLowerCase()
     const weather = String(Array.isArray(fields.weather) ? fields.weather[0] : fields.weather || 'sunny').toLowerCase()
@@ -233,12 +309,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const originalHeight = fields.originalHeight ? parseInt(String(Array.isArray(fields.originalHeight) ? fields.originalHeight[0] : fields.originalHeight)) : undefined
     const fileArray = Array.isArray(files.file) ? files.file : [files.file]
     const file = fileArray[0]
-    
+
     if (!file) {
       console.error('No file provided')
       return res.status(400).json({ ok: false, error: 'file is required' })
     }
-    
+
     if (!(style in REFERENCE_IMAGES)) {
       console.error(`Invalid style: ${style}`)
       return res.status(400).json({ ok: false, error: `invalid style: ${style}. Valid styles: ${Object.keys(REFERENCE_IMAGES).join(', ')}` })
@@ -352,8 +428,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ ok: false, error: 'no image data in response' })
     }
 
+    // クレジット消費処理（auth.uid()で自動的に実行者のクレジットを消費）
+    console.log('Attempting to consume credit...')
+    const { data: consumeData, error: updateError } = await supabase.rpc('consume_credit')
 
-    return res.json({ 
+    if (updateError) {
+      console.error('Credit consumption error:', updateError)
+      console.error('Error details:', JSON.stringify(updateError, null, 2))
+      // クレジット消費エラーでも画像は返す（ログのみ記録）
+      // 実際には再試行ロジックを追加することも検討
+    } else {
+      console.log('Credit consumption successful!', consumeData)
+    }
+
+    return res.json({
       ok: true,
       imageBase64: `data:${outMime};base64,${outB64}`,
       mimeType: outMime,

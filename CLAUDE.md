@@ -168,3 +168,70 @@ OKIBAE is a web-based PWA tool designed for handmade creators (especially macram
 - ブランチ: `feature/agent/ui-styling`
 - 開発サーバー: port 3002で安定動作
 - AI画像生成: 高品質・高成功率で稼働中
+
+## 🚀 ログイン機能実装（2025-01-20）
+
+### ✅ Phase 1: 認証基盤完了
+1. **Supabase認証実装**
+   - Supabaseプロジェクト作成・設定
+   - Google OAuth連携
+   - `@supabase/supabase-js`, `@supabase/ssr` インストール
+   - Supabaseクライアント設定（lib/supabase/client.ts, server.ts）
+
+2. **認証機能実装**
+   - AuthContext作成（contexts/AuthContext.tsx）
+   - useAuthフック実装
+   - ログインページUI作成（pages/login.tsx）
+   - 未ログイン時の自動リダイレクト
+   - NavBarにログアウトボタン追加
+   - Reactフックルール違反修正（index.tsx）
+
+3. **データベース統合**
+   - テーブル作成（profiles, subscriptions, credits）
+   - RLS（Row Level Security）ポリシー設定
+   - 新規ユーザー自動登録トリガー実装
+   - 先着100名判定機能（has_launch_couponフラグ）
+   - TypeScript型定義作成（types/database.ts）
+   - AuthContextにユーザーデータ自動取得機能追加
+   - NavBarにクレジット残高表示（のこり 20/20）
+   - Hydrationエラー修正（クライアントサイドレンダリング対応）
+
+### 📋 データベース設計
+```
+profiles
+  - id (uuid, FK to auth.users)
+  - email
+  - stripe_customer_id
+  - created_at, updated_at
+
+subscriptions
+  - user_id (uuid, FK to auth.users)
+  - status ('free' | 'pro')
+  - stripe_subscription_id
+  - current_period_start, current_period_end
+  - cancel_at_period_end
+  - has_launch_coupon (先着100名特典フラグ)
+  - created_at, updated_at
+
+credits
+  - user_id (uuid, FK to auth.users)
+  - balance (残高)
+  - total_used (累計使用数)
+  - last_reset_at (リセット日時)
+  - updated_at
+```
+
+### 🎯 次回実装予定（Phase 2: 決済・サブスク）
+1. **Stripeアカウント設定**
+2. **Stripe連携パッケージインストール**
+3. **サブスク購入フロー実装**（¥600/月、先着100名は3ヶ月¥400/月）
+4. **Webhook実装**（サブスク状態同期）
+5. **追加クレジット購入**（+30枚 ¥200）
+
+### 💻 技術スタック更新
+- **認証**: Supabase Authentication (Google OAuth)
+- **データベース**: Supabase PostgreSQL
+- **ブランチ**: `feature/agent/login-system`
+- **コミット**:
+  - `b9775f2` feat(auth): Implement Supabase authentication with Google login
+  - `6018fe6` feat(db): Add user data management with Supabase
