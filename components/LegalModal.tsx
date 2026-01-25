@@ -3,13 +3,20 @@ import React from 'react'
 interface LegalModalProps {
   isOpen: boolean
   onClose: () => void
-  type: 'terms' | 'privacy'
+  type: 'terms' | 'privacy' | 'about'
 }
 
 export function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
   if (!isOpen) return null
 
   const isTerms = type === 'terms'
+  const isAbout = type === 'about'
+
+  const getTitle = () => {
+    if (isTerms) return '利用規約'
+    if (isAbout) return '「OKIBAE」って？'
+    return 'プライバシーポリシー'
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -24,7 +31,7 @@ export function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
         {/* ヘッダー */}
         <div className="flex items-center justify-between p-6 border-b border-pink-100">
           <h2 className="text-xl font-bold" style={{ color: '#666' }}>
-            {isTerms ? '利用規約' : 'プライバシーポリシー'}
+            {getTitle()}
           </h2>
           <button
             onClick={onClose}
@@ -38,9 +45,9 @@ export function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
 
         {/* スクロール可能なコンテンツエリア */}
         <div className="overflow-y-auto flex-1 p-6">
-          <p className="text-sm text-gray-500 mb-6">最終更新日: 2026年1月7日</p>
+          {!isAbout && <p className="text-sm text-gray-500 mb-6">最終更新日: 2026年1月7日</p>}
 
-          {isTerms ? <TermsContent /> : <PrivacyContent />}
+          {isTerms ? <TermsContent /> : isAbout ? <AboutContent /> : <PrivacyContent />}
         </div>
       </div>
     </div>
@@ -223,6 +230,78 @@ function TermsContent() {
           お問い合わせ先: okibae.help@gmail.com
         </p>
       </div>
+    </div>
+  )
+}
+
+// OKIBAEとは のコンテンツ
+function AboutContent() {
+  return (
+    <div className="space-y-6 text-base leading-relaxed">
+      <section>
+        <h3 className="text-lg font-bold mb-3" style={{ color: '#666' }}>
+          ご紹介
+        </h3>
+        <p className="text-gray-700">
+          このアプリは、ハンドメイド作品やお気に入りの小物を、簡単に「置き画」風の写真に仕上げられるツールです。<br/>
+          背景や光の雰囲気を選ぶだけで、AIが自動でおしゃれな画像を生成します。
+        </p>
+      </section>
+
+      <section>
+        <p className="text-gray-700">
+          minneなどのオンラインショップ、SNS投稿などにご自由にご活用いただけます。
+        </p>
+      </section>
+
+      <section>
+        <div className="space-y-2 text-gray-700">
+          <p>
+            Googleアカウントがあれば<span className="font-semibold text-brand-600">無料</span>ではじめられます。<br />
+            まずは<span className="font-semibold text-brand-600">5枚分</span>のクレジットで試してみましょう！
+          </p>
+          <p className="text-sm text-gray-600">
+            ※使い切った後は、<span className="font-semibold">10枚 ¥200</span> で追加購入できます。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-bold mb-3" style={{ color: '#666' }}>
+          ご利用上の注意
+        </h3>
+        <div className="space-y-3 text-gray-700">
+          <div>
+            <h4 className="font-semibold mb-1" style={{ color: '#666' }}>AIによる生成について</h4>
+            <p className="text-sm">
+              AIが自動で画像を生成するため、意図した結果にならない場合があります。<br />
+              保存前に必ず確認してください。
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-1" style={{ color: '#666' }}>画像データの取り扱い</h4>
+            <p className="text-sm">
+              アップロードした画像は処理後に削除され、サーバーに保存されることはありません。<br />
+              また、AIの学習に使用されることもありません。
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-1" style={{ color: '#666' }}>適切なご利用を</h4>
+            <p className="text-sm">
+              公序良俗に反する画像や、第三者の権利を侵害する画像のアップロードはお控えください。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="bg-orange-50 border-l-4 border-orange-200 p-4 rounded-r-lg" style={{backgroundColor: '#EDBC9D20'}}>
+          <p className="text-orange-600 text-sm" style={{color: '#B8899A'}}>
+            ※このアプリは現在 <strong>β版</strong>（2026年1月7日現在）です。<br/>
+            機能や仕様は今後変更されることがあります。
+          </p>
+        </div>
+      </section>
     </div>
   )
 }
