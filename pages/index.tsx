@@ -39,6 +39,13 @@ export default function Home() {
   const { isIOS, isAndroid } = useDeviceType()
   const { isInstalled, canPrompt, promptInstall } = usePWAInstall()
 
+  // iPhone判定（ダウンロードボタン用）
+  const [isIPhone, setIsIPhone] = useState(false)
+  useEffect(() => {
+    const ua = navigator.userAgent
+    setIsIPhone(/iPhone/.test(ua))
+  }, [])
+
   // すべてのstateとrefをフックルールに従って最上部に配置
   const [file, setFile] = useState<File | null>(null)
   const [imgUrl, setImgUrl] = useState<string>('')
@@ -571,38 +578,47 @@ export default function Home() {
             </div>
 
             {appState.phase === 'FINAL_READY' && (
-              <div className="flex items-center gap-3">
-                <button className="btn btn-ghost whitespace-nowrap" onClick={handleSave}>
-                  ダウンロード
-                </button>
-                {canShare && (
-                  <button
-                    className="btn btn-ghost p-2 flex items-center gap-2 whitespace-nowrap"
-                    onClick={handleShare}
-                    title="共有"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 48 48"
-                      className="w-5 h-5"
-                    >
-                      <defs>
-                        <style>{`.cls-1,.cls-2{fill:none;}.cls-2{stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:4px;}`}</style>
-                      </defs>
-                      <g>
-                        <rect className="cls-1" width="48" height="48"/>
-                      </g>
-                      <g>
-                        <polyline className="cls-2" points="6 34.83 6 41.83 42 41.83 42 34.83"/>
-                        <line className="cls-2" x1="24" y1="32.82" x2="24" y2="18.82"/>
-                        <line className="cls-2" x1="24" y1="9" x2="13" y2="20"/>
-                        <line className="cls-2" x1="24" y1="9" x2="35" y2="20"/>
-                      </g>
-                    </svg>
-                    共有
+              <>
+                <div className="flex items-center gap-3">
+                  <button className="btn btn-ghost whitespace-nowrap" onClick={handleSave}>
+                    {isIPhone ? 'ファイルに保存' : 'ダウンロード'}
                   </button>
+                  {canShare && (
+                    <button
+                      className="btn btn-ghost p-2 flex items-center gap-2 whitespace-nowrap"
+                      onClick={handleShare}
+                      title="共有"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 48 48"
+                        className="w-5 h-5"
+                      >
+                        <defs>
+                          <style>{`.cls-1,.cls-2{fill:none;}.cls-2{stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:4px;}`}</style>
+                        </defs>
+                        <g>
+                          <rect className="cls-1" width="48" height="48"/>
+                        </g>
+                        <g>
+                          <polyline className="cls-2" points="6 34.83 6 41.83 42 41.83 42 34.83"/>
+                          <line className="cls-2" x1="24" y1="32.82" x2="24" y2="18.82"/>
+                          <line className="cls-2" x1="24" y1="9" x2="13" y2="20"/>
+                          <line className="cls-2" x1="24" y1="9" x2="35" y2="20"/>
+                        </g>
+                      </svg>
+                      共有
+                    </button>
+                  )}
+                </div>
+                {isIPhone && (
+                  <div className="bg-orange-50 border-l-4 border-orange-200 p-3 rounded-r-lg mt-3" style={{ backgroundColor: 'rgba(237, 188, 157, 0.125)' }}>
+                    <p className="text-orange-600 text-sm" style={{ color: 'rgb(184, 137, 154)' }}>
+                      💡 <strong>写真アプリに保存したい場合：</strong>画像を長押しして「共有」から保存してください
+                    </p>
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
             {/* フィードバックリンク */}

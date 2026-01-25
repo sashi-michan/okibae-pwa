@@ -12,6 +12,7 @@ export default function Login() {
   const [errorType, setErrorType] = useState<ErrorType | null>(null)
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [showPrivacyModal, setShowPrivacyModal] = useState(false)
+  const [showAboutModal, setShowAboutModal] = useState(false)
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -152,10 +153,22 @@ export default function Login() {
                   おしゃれな置き画が簡単に作れるアプリ。<br />
                   あなたの商品写真を、もっと<span className="text-gray-800 font-normal border-b border-[#d4c4b7] pb-1">素敵</span>に。
                 </p>
+                {/* OKIBAEって？リンク */}
+                <div className="text-center md:text-left">
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setShowAboutModal(true)
+                    }}
+                    className="text-sm text-gray-500 font-light hover:text-gray-700 underline decoration-gray-300 hover:decoration-gray-500 transition-colors cursor-pointer"
+                  >
+                    &gt;&gt; はじめる前に
+                  </a>
+                </div>
               </div>
 
-
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={isSigningIn}
@@ -214,6 +227,11 @@ export default function Login() {
         isOpen={showPrivacyModal}
         onClose={() => setShowPrivacyModal(false)}
         type="privacy"
+      />
+      <LegalModal
+        isOpen={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        type="about"
       />
 
       {/* エラーモーダル */}
