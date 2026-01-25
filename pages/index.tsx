@@ -614,7 +614,7 @@ export default function Home() {
                 {isIPhone && (
                   <div className="bg-orange-50 border-l-4 border-orange-200 p-3 rounded-r-lg mt-3" style={{ backgroundColor: 'rgba(237, 188, 157, 0.125)' }}>
                     <p className="text-orange-600 text-sm" style={{ color: 'rgb(184, 137, 154)' }}>
-                      💡 <strong>写真アプリに保存したい場合：</strong>画像を長押しして「共有」から保存してください
+                      💡 <strong>写真アプリに入れたいときは：</strong>「共有」ボタンから保存してください
                     </p>
                   </div>
                 )}
