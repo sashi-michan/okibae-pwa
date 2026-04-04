@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Text model response:', textResponse)
     
     // 次に画像対応モデルでテスト
-    const imageModel = vertexAI.preview.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' })
+    const imageModel = vertexAI.preview.getGenerativeModel({ model: 'gemini-2.5-flash-image' })
     const imageResult = await imageModel.generateContent({
       contents: [{
         role: 'user',

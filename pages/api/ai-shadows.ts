@@ -362,14 +362,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Vertex AI Gemini API呼び出し（2つの画像を送信）
     let result
     try {
-      console.log('Calling Vertex AI with model:', 'gemini-2.5-flash-image-preview')
+      console.log('Calling Vertex AI with model:', 'gemini-2.5-flash-image')
       console.log('Project:', process.env.GOOGLE_CLOUD_PROJECT)
       console.log('Location:', process.env.GOOGLE_CLOUD_LOCATION)
 
       // 毎回新しいVertex AIインスタンスとモデルを作成してセッション独立性を確保
       const vertexAI = createVertexAI();
       const freshGenerativeModel = vertexAI.preview.getGenerativeModel({
-        model: 'gemini-2.5-flash-image-preview',
+        model: 'gemini-2.5-flash-image',
       });
 
       // Base64データの確認
